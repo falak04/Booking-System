@@ -4,7 +4,7 @@ const RoomSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true }, // Room/Lab Name
   type: { type: String, enum: ["Classroom", "Lab"], required: true }, // Type of Room
   capacity: { type: Number, required: true }, // Capacity of the Room
-  location: { type: String }, // Location of the Room
+  location: { type: String ,default:"Department of Information Technology"}, // Location of the Room
   schedule: [
     {
       day: {

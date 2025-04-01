@@ -129,7 +129,7 @@ function LabAssistantDashboard() {
           Input Timetable
         </Button>
 
-        <PrintTimeTable roomName={selectedRoom} timetable={timetable} />
+        {/* <PrintTimeTable roomName={selectedRoom} timetable={timetable} /> */}
 
         {/* Timetable display table */}
         <div style={{ maxHeight: "70vh", overflowY: "auto", marginTop: 20 }}>

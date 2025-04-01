@@ -3,54 +3,121 @@ const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 const router = express.Router();
 const { authenticateUser, authorizeRole } = require("../middleware/auth");
-// async function removeExpiredBookings() {
-//   try {
-//     const today = new Date();
-//     today.setHours(0, 0, 0, 0); // Normalize to start of the day
-
-//     console.log("⏳ Running Cleanup: Checking for expired bookings...");
-
-//     // 1️⃣ Find expired bookings
-//     const expiredBookings = await Booking.find({ date: { $lt: today-1 } });
-
-//     if (expiredBookings.length === 0) {
-//       console.log("✅ No expired bookings found.");
-//       return;
-//     }
-
-//     console.log(`🚨 Found ${expiredBookings.length} expired bookings.`);
-
-//     // 2️⃣ Remove expired bookings from the timetable
-//     for (const booking of expiredBookings) {
-//       const room = await Room.findOne({ name: booking.classroom });
-
-//       if (room) {
-//         const [startTime, endTime] = booking.timeSlot.split("-");
-
-//         // Remove matching schedule entry
-//         room.schedule = room.schedule.filter(
-//           (entry) => !(entry.day === booking.day && entry.startTime === startTime && entry.endTime === endTime)
-//         );
-
-//         await room.save();
-//       }
-//     }
-
-//     // 3️⃣ Delete expired bookings from the database
-//     await Booking.deleteMany({ date: { $lt: today } });
-
-//     console.log("🗑️ Expired bookings removed successfully!");
-//   } catch (error) {
-//     console.error("🚨 Error in removing expired bookings:", error);
-//   }
-// }
-
+// const {removeExpiredBookings}=require("../utils/removeExpiredBookings")
+async function removeExpiredBookings() {
+  try {
+    const today = new Date();
+    // today.setHours(0, 0, 0, 0); // Normalize to start of the day
+    
+    console.log("⏳ Running Cleanup: Checking for expired bookings...");
+    
+    // Convert today to ISO string format (YYYY-MM-DD) to match your date storage format
+    const todayStr = today.toISOString().split('T')[0];
+    console.log(todayStr)
+    // Find bookings with dates in the past
+    const expiredBookings = await Booking.find({ 
+      date: { $lt: todayStr} 
+    }).populate("teacher", "name email");
+    
+    if (expiredBookings.length === 0) {
+      console.log("✅ No expired bookings found.");
+      return { removed: 0 };
+    }
+    
+    console.log(`🚨 Found ${expiredBookings.length} expired bookings to clean up.`);
+    
+    // Process each expired booking
+    let cleanupCount = 0;
+    for (const booking of expiredBookings) {
+      try {
+        // Find the corresponding room
+        const room = await Room.findOne({ name: booking.classroom });
+        
+        if (room) {
+          // Parse the time slot
+          const [startTime, endTime] = booking.timeSlot.split("-");
+          
+          // Get the day of week from the booking date
+          const bookingDate = new Date(booking.date);
+          const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          const bookingDay = daysOfWeek[bookingDate.getDay()]; 
+          
+          // Find the exact schedule entry to remove
+          const initialScheduleLength = room.schedule.length;
+          
+          // Remove only the specific booking entry from the room schedule
+          room.schedule = room.schedule.filter(entry => {
+            // Keep all entries that don't match the exact booking parameters
+            return !(
+              entry.day === bookingDay && 
+              entry.startTime === startTime && 
+              entry.endTime === endTime &&
+              (
+                // Match any approval status since we're removing expired bookings regardless of status
+                entry.approvalStatus === "pendingApproval" || 
+                entry.approvalStatus === "approved" || 
+                entry.approvalStatus === "granted"
+              )
+            );
+          });
+          
+          // Only save if we actually removed something
+          if (initialScheduleLength > room.schedule.length) {
+            await room.save();
+            console.log(`🧹 Removed expired booking slot from room ${room.name} schedule`);
+          }
+        }
+        
+        // Delete the expired booking document
+        await Booking.findByIdAndDelete(booking._id);
+        cleanupCount++;
+        
+      } catch (error) {
+        console.error(`Error processing expired booking ${booking._id}:`, error);
+        // Continue with next booking even if this one fails
+      }
+    }
+    
+    console.log(`🗑️ Successfully removed ${cleanupCount} expired bookings!`);
+    return { removed: cleanupCount };
+    
+  } catch (error) {
+    console.error("🚨 Error in removing expired bookings:", error);
+    throw error;
+  }
+}
 // 📌 Teacher Requests a Booking (Temporarily Block Slot
 router.post("/", authenticateUser, async (req, res) => {
   try {
     console.log("Received booking request:", req.body);
-
-    const { roomId, date, day, timeSlot, purpose } = req.body; // Ensure `day` is extracted
+    
+    const { roomId, date, day, timeSlot, purpose } = req.body;
+    
+    // Add debugging to understand the date issue
+    console.log("Booking date received:", date);
+    console.log("Current date:", new Date().toISOString());
+    
+    // More lenient date validation - only block past dates, allow same-day bookings
+    if (date) {
+      const bookingDate = new Date(date);
+      const currentDate = new Date();
+      
+      // Strip time components for pure date comparison
+      const bookingDateStr = bookingDate.toISOString().split('T')[0];
+      const currentDateStr = currentDate.toISOString().split('T')[0];
+      
+      console.log("Booking date (date only):", bookingDateStr);
+      console.log("Current date (date only):", currentDateStr);
+      
+      // Only block dates in the past, allow today's date
+      if (new Date(bookingDateStr) <= new Date(currentDateStr)) {
+        console.log("Rejecting booking: date is in the past");
+        return res.status(400).json({ 
+          error: "Booking date cannot be in the past." 
+        });
+      }
+    }
+    
     console.log("Step 1: Checking existing bookings");
     console.log(req.user)
     // Check if the slot is already booked
@@ -60,11 +127,11 @@ router.post("/", authenticateUser, async (req, res) => {
       timeSlot,
       status: { $ne: "Rejected" }, // Ignore rejected bookings
     });
-
+    
     if (existingBooking) {
       return res.status(400).json({ error: "This time slot is already booked." });
     }
-
+    
     console.log("Step 2: Creating new booking");
     const booking = new Booking({
       teacher: req.user.id,
@@ -76,48 +143,46 @@ router.post("/", authenticateUser, async (req, res) => {
       status: "Pending",
       hodStatus: "Pending",
     });
-
+    
     await booking.save();
     console.log("Step 3: Booking saved successfully!");
-
+    
     // 📌 **TEMPORARILY BLOCK SLOT IN TIMETABLE**
     console.log("Step 4: Updating room schedule temporarily");
     const room = await Room.findOne({ name: roomId });
-
+    
     if (!room) {
       console.error("🚨 Error: Room not found in the database!");
       return res.status(404).json({ error: "Room not found" });
     }
-
+    
     const [startTime, endTime] = timeSlot.split("-");
     console.log("Step 5: Adding temporary slot in room timetable");
-
+    
     room.schedule.push({
       day,
       startTime,
       endTime,
       subject: "Pending Approval",
       faculty: req.user.name,
-      approvalStatus:"pendingApproval"
-       // Assigning booking requester's name
+      approvalStatus: "pendingApproval"
+      // Assigning booking requester's name
     });
-
+    
     await room.save();
     console.log("Step 6: Room schedule updated successfully");
-
+    
     res.status(201).json({ message: "Booking request submitted!", booking });
-
   } catch (error) {
     console.error("🚨 Error in booking:", error.message);
     res.status(500).json({ error: "Server error while processing booking." });
   }
 });
 
-
 // 📌 Get All Bookings (For Admin & HOD)
 router.get("/", authenticateUser, authorizeRole(["Admin", "HOD"]), async (req, res) => {
   try {
-    // await removeExpiredBookings();
+    await removeExpiredBookings();
     const bookings = await Booking.find().populate("teacher", "name email");
     res.json(bookings);
   } catch (error) {
@@ -319,7 +384,7 @@ router.put("/hod/reject/:id", authenticateUser, authorizeRole(["HOD"]), async (r
 // 📌 Get Bookings for a Teacher (For Teacher Dashboard)
 router.get("/teacher", authenticateUser, async (req, res) => {
   try {
-    // await removeExpiredBookings();
+    await removeExpiredBookings();
     const bookings = await Booking.find({ teacher: req.user.id }).populate("teacher", "name email");
     res.json(bookings);
   } catch (error) {
