@@ -4,7 +4,7 @@ const RoomSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true }, // Room/Lab Name
   type: { type: String, enum: ["Classroom", "Lab"], required: true }, // Type of Room
   capacity: { type: Number, required: true }, // Capacity of the Room
-  location: { type: String ,default:"Department of Information Technology"}, // Location of the Room
+  location: { type: String, default: "Department of Information Technology" }, // Location of the Room
   schedule: [
     {
       day: {
@@ -16,6 +16,10 @@ const RoomSchema = new mongoose.Schema({
       endTime: { type: String, required: true }, // Example: "08:30 AM"
       subject: { type: String, required: true }, // Example: "Machine Learning"
       faculty: [{ type: String, required: true }], // Example: ["Dr. Leena Sahu", "Prof. Rajesh Kumar"]
+      class:{
+        year:String,
+        division:String,
+      }, // Example: "I1" for division of the third year
       approvalStatus: { 
         type: String, 
         enum: ["pendingApproval", "approved", "granted", "default"],
@@ -24,5 +28,4 @@ const RoomSchema = new mongoose.Schema({
     }
   ]
 });
-
-module.exports = mongoose.model("Room", RoomSchema);
+module.exports=mongoose.model("Room",RoomSchema);

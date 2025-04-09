@@ -1,81 +1,161 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
-import { TextField, Button, Container, Typography, MenuItem, Box } from "@mui/material";
-
-// Faculty list with predefined names and roles
-const facultyRoles = {
-  "Dr. Vinaya Sawant (VS)": "HOD",
-  "Ms. Neha Katre (NK)": "Admin",
-  "Prasad Sir":"Lab Assistant"
-};
-
-const facultyNames = [
-  "Dr. Vinaya Sawant (VS)", "Dr. Abhijit Joshi (ARJ)", "Dr. Ram Mangulkar (RM)",
-  "Dr. SatishKumar Verma (SV)", "Dr. Monika Mangla (MM)", "Ms. Neha Katre (NK)",
-  "Mr. Harshal Dalvi (HD)", "Mr. Arjun Jaiswal (AJ)", "Ms. Stevina Coriea (SC)",
-  "Ms. Prachi Satan (PS)", "Ms. Neha Agarwal (NA)", "Ms. Sharvari Patil (SP)",
-  "Ms. Richa Sharma (RS)", "Ms. Sweedle Machado (SM)", "Ms. Priyanca Gonsalves (PG)",
-  "Ms. Anushree Patkar (AP)", "Ms. Monali Sankhe (MS)", "Ms. Savyasachi Pandit (SSP)",
-  "Mr. Chandrashekhar Badgujar (CB)", "Mr. Suryakant Chaudhari (STC)", "Dr. Gayatri Pandya (GP)",
-  "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)", "Ms. Leena Sahu (LS)","Prasad Sir"
-];
-
-// const obj = {
-//   1 : "abc@mgail.com",
-//   2 : "sakfjds",
-
-// }
-
-// obj[id]
+import { TextField, Button, Typography, MenuItem } from "@mui/material";
+import "./RegisterPage.css";
+import registerIllustration from '../assets/registerIllustration.png';
+import Navbar from "../components/Navbar";
+import axios from "axios";
 
 function Register() {
+  const [facultyList, setFacultyList] = useState([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(""); // Role will be auto-assigned
+  const [role, setRole] = useState("");
+  const [error, setError] = useState("");
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  // Function to set role automatically
+  useEffect(() => {
+    const fetchFacultyList = async () => {
+      axios
+      .get("http://localhost:5000/api/auth/faculty-list")
+      .then((response) => {
+        setFacultyList(response.data.facultyList);
+      })
+      .catch(error => console.error("Error fetching faculty list:", error));
+    
+    };
+
+    fetchFacultyList();
+  }, []);
+
   const handleNameChange = (event) => {
     const selectedName = event.target.value;
     setName(selectedName);
-    setRole(facultyRoles[selectedName] || "Teacher"); // Default role is 'teacher'
+    const selectedFaculty = facultyList.find(f => f.name === selectedName);
+    setRole(selectedFaculty?.role || "Teacher");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await register(name, email, password, role);
+
+    if (!name || !email || !password) {
+      setError("Please fill all fields.");
+      return;
+    }
+
+    try {
+      await register(name, email, password, role);
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      setError("Registration failed. Please try again.");
+    }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Typography variant="h4" gutterBottom>Register</Typography>
-      <form onSubmit={handleSubmit}>
-        {/* Faculty Name Dropdown */}
-        <TextField select label="Select Name" fullWidth margin="normal" value={name} onChange={handleNameChange}>
-          {facultyNames.map((faculty, index) => (
-            <MenuItem key={index} value={faculty}>{faculty}</MenuItem>
-          ))}
-        </TextField>
+    <>
+      <Navbar />
+      <div className="register-container">
+        <div className="register-form-container">
+          <div className="form-header">
+            <h2>DJSCE Feedback Portal</h2>
+          </div>
 
-        <TextField label="Email" fullWidth margin="normal" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <TextField label="Password" type="password" fullWidth margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div className="register-form-content">
+            <div className="form-section">
+              <h1>SIGN UP</h1>
 
-        {/* Role (Auto-selected based on Name) */}
-        <TextField label="Role" fullWidth margin="normal" value={role} disabled />
+              {error && (
+                <Typography color="error" variant="body2" sx={{ mb: 2 }}>
+                  {error}
+                </Typography>
+              )}
 
-        <Button type="submit" variant="contained" color="primary" fullWidth>Register</Button>
-      </form>
+              <form onSubmit={handleSubmit} className="original-form">
+                <TextField
+                  select
+                  label="Select Name"
+                  fullWidth
+                  margin="normal"
+                  value={name}
+                  onChange={handleNameChange}
+                  className="styled-input"
+                >
+                  {facultyList.map((faculty, index) => (
+                    <MenuItem key={index} value={faculty.name}>
+                      {faculty.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
-      {/* Link to Login */}
-      <Box mt={2} textAlign="center">
-        <Typography variant="body1">
-          Already have an account? <Link to="/login" style={{ color: "blue", textDecoration: "none" }}>Login here</Link>
-        </Typography>
-      </Box>
-    </Container>
+                <TextField
+                  label="Email"
+                  fullWidth
+                  margin="normal"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="styled-input"
+                />
+
+                <TextField
+                  label="Password"
+                  type="password"
+                  fullWidth
+                  margin="normal"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="styled-input"
+                />
+
+                <TextField
+                  label="Role"
+                  fullWidth
+                  margin="normal"
+                  value={role}
+                  disabled
+                  className="styled-input"
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  className="register-btn"
+                  sx={{
+                    backgroundColor: "#2c3e50",
+                    color: "white",
+                    padding: "12px",
+                    marginTop: 2,
+                    borderRadius: "4px",
+                    textTransform: "none",
+                    fontSize: "16px",
+                    "&:hover": {
+                      backgroundColor: "#1a2530",
+                    },
+                  }}
+                >
+                  Register
+                </Button>
+              </form>
+
+              <div className="login-link">
+                <Typography variant="body1">
+                  Already have an account? <Link to="/login">Login</Link>
+                </Typography>
+              </div>
+            </div>
+
+            <div className="illustration">
+              <img src={registerIllustration} alt="Person working at desk" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

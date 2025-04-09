@@ -15,6 +15,9 @@ function TimeTableNavbar({ title }) {
     dashboardPath = "/admin-dashboard";
   } else if (user.user.role === "HOD") {
     dashboardPath = "/hod-dashboard";
+  }else if(user.user.role === "Lab Assistant")
+  {
+    dashboardPath="/lab";
   }
 
   return (

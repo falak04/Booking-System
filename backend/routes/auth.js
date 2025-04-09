@@ -2,76 +2,46 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Faculty = require("../models/Falculty");
+const { authenticateUser } = require("../middleware/auth");
+const optionalAuth = require("../middleware/optionalAuth");
 
 const router = express.Router();
 
-// Predefined Faculty List and Roles
-const facultyRoles = {
-  "Dr. Vinaya Sawant (VS)": "HOD",
-  "Ms. Neha Katre (NK)": "Admin",
-  "Prasad Sir":"Lab Assistant"
-};
+const validRoles = ["Teacher", "Lab Assistant", "HOD", "Admin"];
+const isHOD = (role) => role === "HOD";
 
-const facultyNames = [
-  "Dr. Vinaya Sawant (VS)", "Dr. Abhijit Joshi (ARJ)", "Dr. Ram Mangulkar (RM)",
-  "Dr. SatishKumar Verma (SV)", "Dr. Monika Mangla (MM)", "Ms. Neha Katre (NK)",
-  "Mr. Harshal Dalvi (HD)", "Mr. Arjun Jaiswal (AJ)", "Ms. Stevina Coriea (SC)",
-  "Ms. Prachi Satan (PS)", "Ms. Neha Agarwal (NA)", "Ms. Sharvari Patil (SP)",
-  "Ms. Richa Sharma (RS)", "Ms. Sweedle Machado (SM)", "Ms. Priyanca Gonsalves (PG)",
-  "Ms. Anushree Patkar (AP)", "Ms. Monali Sankhe (MS)", "Ms. Savyasachi Pandit (SSP)",
-  "Mr. Chandrashekhar Badgujar (CB)", "Mr. Suryakant Chaudhari (STC)", "Dr. Gayatri Pandya (GP)",
-  "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)", "Ms. Leena Sahu (LS)","Prasad Sir"
-];
-
-// Get Role Function
-const getRole = (name) => facultyRoles[name] || "Teacher";
-
-// Register Route
+// ✅ Register
 router.post("/register", async (req, res) => {
   try {
-    console.log("📌 Register request received:", req.body);
     const { name, email, password } = req.body;
-
-    // Check if the user is in the allowed faculty list
-    if (!facultyNames.includes(name)) {
-      return res.status(403).json({ error: "You are not authorized to register." });
-    }
-
     if (!name || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: "User already exists" });
+    const faculty = await Faculty.findOne({ name });
+    if (!faculty) {
+      return res.status(403).json({ error: "You are not authorized to register." });
     }
 
-    console.log("📌 Hashing password...");
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: "User already exists" });
+
     const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ name, email, password: hashedPassword, role: faculty.role });
 
-    // Automatically assign the correct role
-    const role = getRole(name);
-
-    console.log("📌 Creating new user...");
-    const user = new User({ name, email, password: hashedPassword, role });
-
-    console.log("📌 Saving user to DB...");
     await user.save();
-
-    console.log("✅ User registered successfully with role:", role);
-    res.status(201).json({ message: "User registered successfully", role });
+    res.status(201).json({ message: "User registered successfully", role: faculty.role });
   } catch (err) {
     console.error("❌ Registration Error:", err);
     res.status(500).json({ error: "Error registering user" });
   }
 });
 
-// Login Route
+// ✅ Login
 router.post("/login", async (req, res) => {
   try {
-    console.log("📌 Login request received:", req.body);
     const { email, password } = req.body;
-
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "User not found" });
 
@@ -84,7 +54,6 @@ router.post("/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    console.log("✅ Login successful for:", user.email);
     res.status(200).json({
       message: "Login successful",
       token,
@@ -93,6 +62,83 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.error("❌ Login Error:", err);
     res.status(500).json({ error: "Error logging in" });
+  }
+});
+
+// ✅ Add Faculty (HOD only)
+router.post("/add-faculty", authenticateUser, async (req, res) => {
+  try {
+    const { name, role } = req.body;
+    if (!isHOD(req.user.role)) {
+      return res.status(403).json({ error: "Only HOD can add faculty members" });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: "Faculty name is required" });
+    }
+
+    const existingFaculty = await Faculty.findOne({ name });
+    if (existingFaculty) {
+      return res.status(400).json({ error: "Faculty already exists" });
+    }
+
+    const faculty = new Faculty({ name, role: validRoles.includes(role) ? role : "Teacher" });
+    await faculty.save();
+
+    res.status(201).json({ message: "Faculty added successfully", faculty });
+  } catch (err) {
+    console.error("❌ Add Faculty Error:", err);
+    res.status(500).json({ error: "Error adding faculty member" });
+  }
+});
+
+// ✅ Remove Faculty (HOD only)
+router.delete("/remove-faculty", authenticateUser, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!isHOD(req.user.role)) {
+      return res.status(403).json({ error: "Only HOD can remove faculty members" });
+    }
+
+    const faculty = await Faculty.findOne({ name });
+    if (!faculty) {
+      return res.status(404).json({ error: "Faculty member not found" });
+    }
+
+    if (faculty.role === "HOD") {
+      return res.status(403).json({ error: "Cannot remove HOD from faculty list" });
+    }
+
+    await Faculty.deleteOne({ name });
+    await User.deleteOne({ name }); // Optional: remove user login if exists
+
+    res.status(200).json({ message: "Faculty removed successfully", facultyName: name });
+  } catch (err) {
+    console.error("❌ Remove Faculty Error:", err);
+    res.status(500).json({ error: "Error removing faculty member" });
+  }
+});
+
+// ✅ Get All Faculty (optional auth for HOD flag)
+router.get("/faculty-list", optionalAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const isHodRequest = user && isHOD(user.role);
+
+    const facultyList = await Faculty.find({});
+    const registeredUsers = await User.find({}, "name");
+    const registeredNames = registeredUsers.map(user => user.name);
+
+    const result = facultyList.map(faculty => ({
+      name: faculty.name,
+      role: faculty.role,
+      isRegistered: isHodRequest ? registeredNames.includes(faculty.name) : undefined,
+    }));
+
+    res.status(200).json({ facultyList: result });
+  } catch (err) {
+    console.error("❌ Get Faculty List Error:", err);
+    res.status(500).json({ error: "Error retrieving faculty list" });
   }
 });
 

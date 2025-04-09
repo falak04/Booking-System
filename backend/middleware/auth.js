@@ -76,5 +76,10 @@ function authorizeRole(roles) {
     next();
   };
 }
+// middleware/auth.js
+
+// const jwt = require("jsonwebtoken");
+const secret = process.env.JWT_SECRET;
+
 
 module.exports = { authenticateUser, authorizeRole };

@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const authRoutes = require("./routes/auth");
 const bookingRoutes = require("./routes/bookings");
 const roomsRoutes=require("./routes/rooms")
-
+const Falculty=require("./models/Falculty");
 dotenv.config();
 const app = express();
 

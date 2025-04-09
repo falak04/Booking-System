@@ -4,7 +4,7 @@ import {
   Container, TextField, Button, Typography, 
   Paper, Box, Stack, TableContainer, CircularProgress
 } from "@mui/material";
-import TimeTableNavbar from "../components/TimeTableNavbar";
+import Navbar from "../components/Navbar";
 
 const ViewTimetable = () => {
   const [roomName, setRoomName] = useState("");
@@ -71,7 +71,7 @@ const ViewTimetable = () => {
     
     try {
       const response = await axios.get(`http://localhost:5000/api/rooms/${roomName}/timetable`);
-      console.log(response.data.timetable)
+      console.log(response.data.timetable);
       setSchedule(response.data.timetable || []);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 
@@ -83,8 +83,13 @@ const ViewTimetable = () => {
     }
   };
 
-  // Improved time string to index conversion
+  // Improved time string to index conversion with special handling for 05:30
   const timeToIndex = (timeStr) => {
+    // Special case for "05:30" as it's the end time of the last slot
+    if (timeStr === "05:30") {
+      return timeSlots.length; // Return the index after the last slot
+    }
+    
     // Convert time to a standardized format for comparison
     let hour = parseInt(timeStr.split(':')[0]);
     const minute = timeStr.split(':')[1];
@@ -150,12 +155,19 @@ const ViewTimetable = () => {
       const startIndex = timeToIndex(entry.startTime);
       let endIndex = timeToIndex(entry.endTime);
       
-      // If end time is the start of a slot, we need to use the previous slot as the end
+      // Skip invalid entries
+      if (startIndex === -1) return;
+      
+      // Handle end time special cases
       if (endIndex > startIndex) {
         endIndex = endIndex - 1;
       }
       
-      if (startIndex === -1 || endIndex === -1) return;
+      // Handle the case where endIndex is still -1 after adjustment
+      if (endIndex === -1) {
+        // If we couldn't find a valid end index, use the last slot
+        endIndex = timeSlots.length - 1;
+      }
       
       classEntries.push({
         day,
@@ -163,8 +175,9 @@ const ViewTimetable = () => {
         endIndex,
         rowSpan: endIndex - startIndex + 1,
         subject: entry.subject,
-        faculty: entry.faculty,
-        approvalStatus: entry.approvalStatus || "default" // Use default if not specified
+        faculty: entry.faculty || "",
+        approvalStatus: entry.approvalStatus || "default", // Use default if not specified
+        class: entry.class || {} // Add class information
       });
       
       // Mark cells as occupied
@@ -179,7 +192,7 @@ const ViewTimetable = () => {
       tableLayout: 'fixed', // This ensures equal column widths
       borderCollapse: 'collapse',
       fontSize: '0.75rem',
-      border: '1px solid #ddd'
+      border: '1px solid #ddd',
     };
 
     // Cell styles
@@ -256,11 +269,19 @@ const ViewTimetable = () => {
                       <div style={{ fontWeight: 'bold', fontSize: '0.7rem', lineHeight: 1.1 }}>
                         {classEntry.subject}
                       </div>
-                      <div style={{ fontSize: '0.65rem', lineHeight: 1.1 }}>
+                      <div>
                         {Array.isArray(classEntry.faculty) 
                           ? `(${classEntry.faculty.join(', ')})`
                           : `(${classEntry.faculty})`}
                       </div>
+                      {/* Add class year and division information */}
+                      {classEntry.class && (classEntry.class.year || classEntry.class.division) && (
+                        <div style={{ marginTop: '2px' }}>
+                          {classEntry.class.year && classEntry.class.division 
+                            ? `${classEntry.class.year}-${classEntry.class.division}`
+                            : classEntry.class.year || classEntry.class.division}
+                        </div>
+                      )}
                     </td>
                   );
                 }
@@ -338,7 +359,7 @@ const ViewTimetable = () => {
 
   return (
     <>
-      <TimeTableNavbar title="View Timetable" />
+      <Navbar />
       <Container maxWidth="lg">
         <Box sx={{ mt: 3, mb: 2 }}>
           <Stack direction="row" spacing={2} alignItems="center">
@@ -357,6 +378,20 @@ const ViewTimetable = () => {
               variant="contained" 
               color="primary" 
               onClick={fetchTimetable}
+              sx={{ 
+                backgroundColor: "#2c3e50", 
+                color: "white", 
+                marginLeft:4,
+                padding: "12px 12px",
+                marginTop:2,
+                marginBottom: 2,
+                borderRadius: 1,
+                textTransform: "none",
+                fontSize: "0.9rem",
+                "&:hover": {
+                  backgroundColor: "#1a2530"
+                }
+              }}
               size="medium"
               disabled={loading}
               startIcon={loading && <CircularProgress size={20} color="inherit" />}
@@ -373,14 +408,10 @@ const ViewTimetable = () => {
         </Box>
 
         {schedule.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Timetable for Room: {roomName}
-            </Typography>
-            
+          <Box sx={{ mt: 1,mb:2 }}>
             {renderLegend()}
             
-            <TableContainer component={Paper} sx={{ mt: 1, overflow: 'auto' }}>
+            <TableContainer component={Paper} sx={{ mt: 1,marginBottom:2}}>
               {renderTimetable()}
             </TableContainer>
           </Box>

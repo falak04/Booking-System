@@ -9,7 +9,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useAuth } from "../context/AuthContext";
-
+import Navbar from "../components/Navbar";
 function CreateBooking() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -106,7 +106,8 @@ function CreateBooking() {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Container sx={{ mt: 30, mb: 2 }}>
+      <Navbar />
+      <Container sx={{mt:2,mb:2 }}>
         <Typography variant="h5" gutterBottom>
           Create a Booking Request
         </Typography>
@@ -121,10 +122,9 @@ function CreateBooking() {
         />
 
         {/* Auto-selected Day */}
-        <Typography variant="h6" sx={{ marginTop: 2 }}>Selected Day: {selectedDay}</Typography>
+        <Typography variant="h6" sx={{ marginTop: 1 }}>Selected Day: {selectedDay}</Typography>
 
         {/* Available Rooms & Time Slots */}
-        <Typography variant="h5" sx={{ marginTop: 3 }}>Available Rooms & Time Slots</Typography>
         <Table>
           <TableHead>
             <TableRow>
@@ -187,7 +187,21 @@ function CreateBooking() {
         />
 
         {/* Submit Button */}
-        <Button type="submit" variant="contained" color="primary" fullWidth onClick={handleSubmit}>
+        <Button type="submit" variant="contained" color="primary" 
+        sx={{ 
+          backgroundColor: "#2c3e50", 
+          color: "white", 
+          padding: "12px 12px",
+          marginTop:2,
+          marginBottom: 2,
+          borderRadius: 1,
+          textTransform: "none",
+          fontSize: "0.9rem",
+          "&:hover": {
+            backgroundColor: "#1a2530"
+          }
+        }}
+        fullWidth onClick={handleSubmit} >
           Create Booking
         </Button>
       </Container>

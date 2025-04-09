@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { 
   Container, Typography, Table, TableHead, TableRow, TableCell, TableBody, 
-  Button, Select, MenuItem, FormControl 
+  Button, Select, MenuItem, FormControl, TextField
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -18,7 +18,7 @@ const facultyNames = [
   "Ms. Richa Sharma (RS)", "Ms. Sweedle Machado (SM)", "Ms. Priyanca Gonsalves (PG)", 
   "Ms. Anushree Patkar (AP)", "Ms. Monali Sankhe (MS)", "Ms. Savyasachi Pandit (SSP)", 
   "Mr. Chandrashekhar Badgujar (CB)", "Mr. Suryakant Chaudhari (STC)", "Dr. Gayatri Pandya (GP)", 
-  "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)", "Ms. Leena Sahu (LS)"
+  "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)", "Ms. Leena Sahu (LS)","Ms. Prahelika Pai (PP)"
 ];
 
 const subjectOptions = [
@@ -49,13 +49,40 @@ function LabAssistantDashboard() {
 
     try {
       const response = await axios.get(`http://localhost:5000/api/rooms/${selectedRoom}/timetable`);
+      console.log(response.data.timetable);
       setTimetable(response.data.timetable || []);
     } catch (error) {
       console.error("Error fetching timetable:", error);
       alert("Failed to load timetable. Please try again.");
     }
   };
-
+  //Handle Delete room
+  // Add this function in the LabAssistantDashboard component
+const handleDeleteRoom = async () => {
+  if (!selectedRoom) {
+    alert("Please select a room first!");
+    return;
+  }
+  
+  if (!window.confirm(`Are you sure you want to delete the entire room "${selectedRoom}" and all its schedule data?`)) {
+    return;
+  }
+  
+  try {
+    await axios.delete(`http://localhost:5000/api/rooms/${selectedRoom}`, {
+      headers: { Authorization: `Bearer ${user.token}` }
+    });
+    
+    // Update UI by removing the deleted room
+    setRooms(rooms.filter(room => room.name !== selectedRoom));
+    setSelectedRoom("");
+    setTimetable([]);
+    alert(`Room "${selectedRoom}" has been deleted successfully!`);
+  } catch (error) {
+    console.error("Error deleting room:", error);
+    alert("Failed to delete room. Please try again.");
+  }
+};
   // Update a timetable entry
   const handleUpdateTimetableEntry = async (roomName, entryId) => {
     try {
@@ -68,18 +95,33 @@ function LabAssistantDashboard() {
       }
 
       const updatedSubject = updatedEntry.subject ?? currentEntry.subject;
-      const updatedFaculty = updatedEntry.faculty ?? currentEntry.faculty; // Now an array
+      const updatedFaculty = updatedEntry.faculty ?? currentEntry.faculty;
+      
+      // Handle class object with year and division
+      const updatedClass = {
+        year: updatedEntry.class?.year ?? currentEntry.class?.year ?? "",
+        division: updatedEntry.class?.division ?? currentEntry.class?.division ?? ""
+      };
 
       await axios.put(
         `http://localhost:5000/api/rooms/${roomName}/schedule/${entryId}`,
-        { subject: updatedSubject, faculty: updatedFaculty },
+        { 
+          subject: updatedSubject, 
+          faculty: updatedFaculty,
+          class: updatedClass
+        },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
 
       // Update local state
       setTimetable(timetable.map(entry => 
         entry._id === entryId 
-          ? { ...entry, subject: updatedSubject, faculty: updatedFaculty }
+          ? { 
+              ...entry, 
+              subject: updatedSubject, 
+              faculty: updatedFaculty,
+              class: updatedClass
+            }
           : entry
       ));
 
@@ -107,33 +149,101 @@ function LabAssistantDashboard() {
     }
   };
 
+  // Handle changes to class fields (year and division)
+  const handleClassChange = (entryId, field, value) => {
+    setEditEntries({
+      ...editEntries,
+      [entryId]: {
+        ...editEntries[entryId] || {},
+        class: {
+          ...(editEntries[entryId]?.class || {}),
+          [field]: value
+        }
+      }
+    });
+  };
+
   return (
     <>
-      <Navbar title="Lab Assistant Dashboard" />
+      <Navbar />
       <Container sx={{ marginTop: 6 }}>
-        <Typography variant="h4">Lab Assistant Dashboard</Typography>
-
-        {/* Room selection dropdown */}
-        <FormControl fullWidth sx={{ marginTop: 3 }}>
-          <Select value={selectedRoom} onChange={(e) => setSelectedRoom(e.target.value)} displayEmpty>
-            <MenuItem value="" disabled>Select Room</MenuItem>
-            {rooms.map(room => (
-              <MenuItem key={room.name} value={room.name}>{room.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        {/* Action buttons */}
-        <Button onClick={fetchTimetable} variant="contained" sx={{ margin: 2 }}>Load Timetable</Button>
-        <Button variant="contained" color="primary" onClick={() => navigate("/admin-dashboard/input-timetable")}>
+        {/* Timetable Management */}
+        <Select 
+          value={selectedRoom} 
+          onChange={(e) => setSelectedRoom(e.target.value)} 
+          sx={{width:"50vw"}} 
+          displayEmpty
+        >
+          <MenuItem value="" disabled>Select Room</MenuItem>
+          {rooms.map(room => (
+            <MenuItem key={room.name} value={room.name}>{room.name}</MenuItem>
+          ))}
+        </Select>
+        <Button 
+          onClick={fetchTimetable} 
+          variant="contained"
+          sx={{ 
+            backgroundColor: "#2c3e50", 
+            color: "white", 
+            marginLeft: 4,
+            padding: "12px 12px",
+            marginTop: 2,
+            marginBottom: 2,
+            borderRadius: 1,
+            textTransform: "none",
+            fontSize: "0.9rem",
+            "&:hover": {
+              backgroundColor: "#1a2530"
+            }
+          }}
+        >
+          Load Timetable
+        </Button>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          sx={{ 
+            backgroundColor: "#2c3e50", 
+            color: "white", 
+            marginLeft: 4,
+            padding: "12px 12px",
+            marginTop: 2,
+            marginBottom: 2,
+            borderRadius: 1,
+            textTransform: "none",
+            fontSize: "0.9rem",
+            "&:hover": {
+              backgroundColor: "#1a2530"
+            }
+          }}
+          onClick={() => navigate("/admin-dashboard/input-timetable")}
+        >
           Input Timetable
         </Button>
-
-        {/* <PrintTimeTable roomName={selectedRoom} timetable={timetable} /> */}
-
-        {/* Timetable display table */}
-        <div style={{ maxHeight: "70vh", overflowY: "auto", marginTop: 20 }}>
-          <Table stickyHeader>
+        <Button 
+  variant="contained" 
+  color="error" 
+  sx={{ 
+    backgroundColor: "#c0392b", 
+    color: "white", 
+    marginLeft: 4,
+    padding: "12px 12px",
+    marginTop: 2,
+    marginBottom: 2,
+    borderRadius: 1,
+    textTransform: "none",
+    fontSize: "0.9rem",
+    "&:hover": {
+      backgroundColor: "#a93226"
+    }
+  }}
+  onClick={handleDeleteRoom}
+  disabled={!selectedRoom}
+>
+  Delete Room
+</Button>
+        {timetable.length > 0 && (
+          <Table sx={{ marginTop: 3, maxHeight: "70vh" }}>
             <TableHead>
               <TableRow>
                 <TableCell>Day</TableCell>
@@ -141,6 +251,8 @@ function LabAssistantDashboard() {
                 <TableCell>End Time</TableCell>
                 <TableCell>Subject</TableCell>
                 <TableCell>Faculty</TableCell>
+                <TableCell>Year</TableCell>
+                <TableCell>Division</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -150,25 +262,20 @@ function LabAssistantDashboard() {
                   <TableCell>{entry.day}</TableCell>
                   <TableCell>{entry.startTime}</TableCell>
                   <TableCell>{entry.endTime}</TableCell>
-
+                  
+                  {/* Editable Subject */}
                   <TableCell>
-                    <FormControl fullWidth size="small">
-                      <Select
-                        value={editEntries[entry._id]?.subject ?? entry.subject}
-                        onChange={(e) =>
-                          setEditEntries({
-                            ...editEntries,
-                            [entry._id]: { ...editEntries[entry._id], subject: e.target.value }
-                          })
-                        }
-                      >
-                        {subjectOptions.map(option => (
-                          <MenuItem key={option} value={option}>{option}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                    <TextField 
+                      value={editEntries[entry._id]?.subject || entry.subject || ""}
+                      onChange={(e) => setEditEntries({ 
+                        ...editEntries, 
+                        [entry._id]: { ...editEntries[entry._id], subject: e.target.value } 
+                      })}
+                      size="small"
+                    />
                   </TableCell>
-
+                  
+                  {/* Editable Faculty Dropdown */}
                   <TableCell>
                     <FormControl fullWidth size="small">
                       <Select
@@ -189,15 +296,52 @@ function LabAssistantDashboard() {
                     </FormControl>
                   </TableCell>
 
+                  {/* Editable Year TextField (from class object) */}
                   <TableCell>
-                    <Button color="primary" onClick={() => handleUpdateTimetableEntry(selectedRoom, entry._id)}>Update</Button>
-                    <Button color="secondary" onClick={() => handleDeleteTimetableEntry(selectedRoom, entry._id)}>Delete</Button>
+                    <TextField
+                      value={
+                        editEntries[entry._id]?.class?.year || 
+                        entry.class?.year || 
+                        ""
+                      }
+                      onChange={(e) => handleClassChange(entry._id, "year", e.target.value)}
+                      size="small"
+                    />
+                  </TableCell>
+
+                  {/* Editable Division TextField (from class object) */}
+                  <TableCell>
+                    <TextField
+                      value={
+                        editEntries[entry._id]?.class?.division || 
+                        entry.class?.division || 
+                        ""
+                      }
+                      onChange={(e) => handleClassChange(entry._id, "division", e.target.value)}
+                      size="small"
+                    />
+                  </TableCell>
+          
+                  {/* Update & Delete Buttons */}
+                  <TableCell>
+                    <Button 
+                      color="primary" 
+                      onClick={() => handleUpdateTimetableEntry(selectedRoom, entry._id)}
+                    >
+                      Update
+                    </Button>
+                    <Button 
+                      color="secondary" 
+                      onClick={() => handleDeleteTimetableEntry(selectedRoom, entry._id)}
+                    >
+                      Delete
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+          </Table>        
+        )}
       </Container>
     </>
   );

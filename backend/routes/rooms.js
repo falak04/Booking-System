@@ -60,65 +60,107 @@ router.get("/:roomName/timetable", async (req, res) => {
   }
 });
 
-/**
- * 📌 Fetch Available Rooms for a Given Day
- */
+
 router.get("/available", async (req, res) => {
   try {
     const { day } = req.query;
     if (!day) {
       return res.status(400).json({ error: "Day is required" });
     }
-
+    
     // Fetch all rooms
     const allRooms = await Room.find();
-
+    
     // Fetch booked slots on the given day
     const bookedRooms = await Room.find({ "schedule.day": day });
-
+    
     const bookedRoomMap = {};
     bookedRooms.forEach(room => {
       bookedRoomMap[room.name] = room.schedule
         .filter(sch => sch.day === day)
-        .map(sch => ({ startTime: sch.startTime, endTime: sch.endTime }));
+        .map(sch => ({ 
+          startTime: normalizeTime(sch.startTime), 
+          endTime: normalizeTime(sch.endTime),
+          originalStart: sch.startTime,
+          originalEnd: sch.endTime
+        }));
     });
-
-    // Generate available time slots (from 08:00 to 17:30)
+    
+    // Define all possible time slots (from 08:00 to 17:30)
     const timeSlots = [
       "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-      "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-      "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
+      "11:00", "11:30", "12:00", "12:30", "01:00", "01:30",
+      "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30"
     ];
-
+    
     // Find available slots for each room
     const availableRooms = {};
     allRooms.forEach(room => {
       const bookedSlots = bookedRoomMap[room.name] || [];
       const availableSlots = [];
-
+      
+      // Check each potential time slot
       for (let i = 0; i < timeSlots.length - 1; i++) {
         const slotStart = timeSlots[i];
         const slotEnd = timeSlots[i + 1];
-
-        const isBooked = bookedSlots.some(b => b.startTime < slotEnd && b.endTime > slotStart);
+        
+        // Normalize for comparison
+        const normalizedStart = normalizeTime(slotStart);
+        const normalizedEnd = normalizeTime(slotEnd);
+        
+        // Check if this slot overlaps with any booked slot
+        let isBooked = false;
+        
+        for (const booking of bookedSlots) {
+          // Check if the time ranges overlap
+          if (isOverlapping(normalizedStart, normalizedEnd, booking.startTime, booking.endTime)) {
+            isBooked = true;
+            break;
+          }
+        }
+        
         if (!isBooked) {
-          availableSlots.push({ startTime: slotStart, endTime: slotEnd });
+          availableSlots.push({ 
+            startTime: slotStart, 
+            endTime: slotEnd 
+          });
         }
       }
-
-      // Add room details (capacity & type) along with available slots
+      
+      // Add room details along with available slots
       availableRooms[room.name] = {
         type: room.type,
         capacity: room.capacity,
         availableSlots
       };
     });
-
+    
     res.json(availableRooms);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Convert time to a number of minutes since midnight for easy comparison
+function normalizeTime(timeStr) {
+  let [hours, minutes] = timeStr.split(':').map(part => parseInt(part, 10));
+  
+  // Convert afternoon hours (1:00 PM - 5:30 PM) to 24-hour format
+  if (hours >= 1 && hours <= 5) {
+    hours += 12;
+  }
+  
+  return hours * 60 + minutes;
+}
+
+// Function to check if two time ranges overlap
+function isOverlapping(start1, end1, start2, end2) {
+  // Two ranges overlap if the start of one is before the end of the other
+  // and the end of the first is after the start of the second
+  return Math.max(start1, start2) < Math.min(end1, end2);
+}
+
+// Helper function to convert 12-hour format to 24-hour format for comparison
 
 router.get("/:roomName/available-week", async (req, res) => {
   try {
@@ -169,53 +211,56 @@ router.get("/:roomName/available-week", async (req, res) => {
 router.post("/add", async (req, res) => {
   try {
     console.log("📥 Received Data:", req.body);
-
-    const { name, day, startTime, endTime, faculty, subject, capacity, type } = req.body;
-
+    
+    const { name, day, startTime, endTime, faculty, subject, capacity, type} = req.body;
+    const {year,division}=req.body.class;
+    
     if (!name || !day || !startTime || !endTime || !faculty || !subject || !capacity || !type) {
       return res.status(400).json({ error: "All fields are required" });
     }
-
-    let existingRoom = await Room.findOne({ name });
-
+    
+    let existingRoom = await Room.find({ name });
+    
     if (!existingRoom) {
       console.log("⚠️ Room not found. Creating new room...");
       existingRoom = new Room({ name, type, capacity, location: "N/A", schedule: [] });
       await existingRoom.save();
     }
-
+    if (!existingRoom.schedule) {
+      existingRoom.schedule = [];
+    }
     const conflict = existingRoom.schedule.some(
       (entry) =>
         entry.day === day &&
         ((startTime >= entry.startTime && startTime < entry.endTime) ||
-         (endTime > entry.startTime && endTime <= entry.endTime))
+        (endTime > entry.startTime && endTime <= entry.endTime))
     );
-
+    
     if (conflict) {
       return res.status(400).json({ error: "Time slot conflict! Room is already booked at this time." });
     }
-
+    
     await Room.updateOne(
       { name },
       { 
-        $push: { 
-          schedule: { 
-            day, 
-            startTime, 
-            endTime, 
+        $push: {
+          schedule: {
+            day,
+            startTime,
+            endTime,
             faculty: Array.isArray(faculty) ? faculty : [faculty], // ✅ Ensure faculty is an array
-            subject 
-          } 
-        }, 
+            subject,
+            class:{year,division}// Added default approval status
+          }
+        },
         $setOnInsert: { type, capacity, location: "N/A" }
       },
       { upsert: true }
     );
-
+    
     console.log("✅ Room updated in database");
-
+    
     res.status(201).json({ message: "Timetable entry added successfully!" });
-
   } catch (error) {
     console.error("❌ Error Saving Room:", error);
     res.status(500).json({ error: "Server error while adding timetable entry" });
@@ -228,36 +273,38 @@ router.post("/add", async (req, res) => {
 router.put("/:roomName/schedule/:entryId", authenticateUser, authorizeRole(["Admin","Lab Assistant"]), async (req, res) => {
   try {
     const { roomName, entryId } = req.params;
-    const { subject, faculty } = req.body;
+    const { subject, faculty, class: classInfo } = req.body;
+    const { year, division } = classInfo || {};
 
     if (!subject || !faculty) {
       return res.status(400).json({ error: "Both subject and faculty are required." });
     }
-
+    
     console.log(1);
-
+    
     const room = await Room.findOneAndUpdate(
       { name: roomName, "schedule._id": entryId },
       { 
-        $set: { 
-          "schedule.$.subject": subject, 
-          "schedule.$.faculty": Array.isArray(faculty) ? faculty : [faculty] // ✅ Ensure faculty is an array
+        $set: {
+          "schedule.$.subject": subject,
+          "schedule.$.faculty": Array.isArray(faculty) ? faculty : [faculty], // ✅ Ensure faculty is an array
+          "schedule.$.class.year": year,
+          "schedule.$.class.division": division
         } 
       },
       { new: true }
     );
-
+    
     if (!room) {
       return res.status(404).json({ error: "Room or schedule entry not found." });
     }
-
+    
     res.json({ message: "Timetable entry updated successfully!", room });
   } catch (error) {
     console.error("❌ Error updating timetable:", error);
     res.status(500).json({ error: "Server error while updating timetable entry." });
   }
 });
-
 /**
  * 📌 Delete a Timetable Entry
  */
@@ -282,5 +329,30 @@ router.delete("/:roomName/schedule/:entryId", authenticateUser, authorizeRole(["
     res.status(500).json({ error: "Server error while deleting timetable entry." });
   }
 });
+// In your routes file (likely in routes/roomRoutes.js or similar)
 
+// Delete a room and all its schedule entries
+router.delete('/:roomName', authenticateUser,authorizeRole(["Admin","Lab Assistant"]), async (req, res) => {
+  try {
+    const { roomName } = req.params;
+    console.log("dhruv");
+    // First, find the room to ensure it exists
+    const room = await Room.findOne({ name: roomName });
+    
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+    
+    // Delete all timetable entries for this room
+    // await Schedule.deleteMany({ room: room._id });
+    
+    // Delete the room itself
+    await Room.deleteOne({ _id: room._id });
+    
+    res.status(200).json({ message: 'Room and all its schedule entries deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting room:', error);
+    res.status(500).json({ message: 'Server error while deleting room', error: error.message });
+  }
+});
 module.exports = router;
