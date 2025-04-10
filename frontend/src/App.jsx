@@ -7,7 +7,7 @@ import Bookings from "./pages/Bookings";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
-import HODDashboard from "./pages/HodDashboard";
+import HODDashboard from "./pages/HODDashboard";
 import Welcome from "./pages/Welcome";
 import CreateBooking from "./pages/CreateBooking"
 import AdminTimeTableInput from "./pages/AdminTimeTableInput";
