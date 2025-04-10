@@ -6,12 +6,13 @@ import { useAuth } from "../context/AuthContext";
 function Requests() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
   useEffect(() => {
     if (!user?.token) return; // Ensure token is available
 
     axios
-      .get("http://localhost:5000/api/bookings/teacher", {
+      .get(`${API}/bookings/teacher`, {
         headers: { Authorization: `Bearer ${user.token}` }, // Send token in header
       })
       .then((response) => {

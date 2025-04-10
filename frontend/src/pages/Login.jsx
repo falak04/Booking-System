@@ -13,9 +13,12 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
+  console.log(API);
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log(API);
     await login(email, password);
   };
 

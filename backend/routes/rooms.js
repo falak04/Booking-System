@@ -63,10 +63,18 @@ router.get("/:roomName/timetable", async (req, res) => {
 
 router.get("/available", async (req, res) => {
   try {
-    const { day } = req.query;
+    const { day, date } = req.query;
+    
     if (!day) {
       return res.status(400).json({ error: "Day is required" });
     }
+    
+    // Convert date string to Date object if provided
+    const requestDate = date ? new Date(date) : null;
+    
+    // Format date to YYYY-MM-DD for comparison
+    const formattedRequestDate = requestDate ? 
+      requestDate.toISOString().split('T')[0] : null;
     
     // Fetch all rooms
     const allRooms = await Room.find();
@@ -77,20 +85,46 @@ router.get("/available", async (req, res) => {
     const bookedRoomMap = {};
     bookedRooms.forEach(room => {
       bookedRoomMap[room.name] = room.schedule
-        .filter(sch => sch.day === day)
-        .map(sch => ({ 
-          startTime: normalizeTime(sch.startTime), 
+        .filter(sch => {
+          // If it's a default schedule, always include it
+          if (sch.day === day && sch.approvalStatus === "default") {
+            return true;
+          }
+          
+          // If it's a special schedule (non-default status), only include if it's for the requested date
+          if (sch.day === day && sch.approvalStatus !== "default") {
+            // If no specific date requested, don't include special bookings
+            if (!requestDate) return false;
+            
+            // Check if the booking date matches the requested date
+            if (sch.date) {
+              const bookingDate = new Date(sch.date);
+              const formattedBookingDate = bookingDate.toISOString().split('T')[0];
+              // console.log(bookingDate)
+              console.log(formattedBookingDate)
+              console.log(formattedRequestDate)
+              return formattedBookingDate === formattedRequestDate;
+            }
+            
+            return false;
+          }
+          
+          return false;
+        })
+        .map(sch => ({
+          startTime: normalizeTime(sch.startTime),
           endTime: normalizeTime(sch.endTime),
           originalStart: sch.startTime,
-          originalEnd: sch.endTime
+          originalEnd: sch.endTime,
+          approvalStatus: sch.approvalStatus
         }));
     });
     
     // Define all possible time slots (from 08:00 to 17:30)
     const timeSlots = [
       "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-      "11:00", "11:30", "12:00", "12:30", "01:00", "01:30",
-      "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30"
+      "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
+      "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"
     ];
     
     // Find available slots for each room
@@ -120,9 +154,9 @@ router.get("/available", async (req, res) => {
         }
         
         if (!isBooked) {
-          availableSlots.push({ 
-            startTime: slotStart, 
-            endTime: slotEnd 
+          availableSlots.push({
+            startTime: slotStart,
+            endTime: slotEnd
           });
         }
       }
@@ -159,9 +193,6 @@ function isOverlapping(start1, end1, start2, end2) {
   // and the end of the first is after the start of the second
   return Math.max(start1, start2) < Math.min(end1, end2);
 }
-
-// Helper function to convert 12-hour format to 24-hour format for comparison
-
 router.get("/:roomName/available-week", async (req, res) => {
   try {
     const { roomName } = req.params;

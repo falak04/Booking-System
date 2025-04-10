@@ -32,10 +32,11 @@ function LabAssistantDashboard() {
   const [timetable, setTimetable] = useState([]);
   const [editEntries, setEditEntries] = useState({});
   const navigate = useNavigate();
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
   // Fetch rooms on load
   useEffect(() => {
-    axios.get("http://localhost:5000/api/rooms")
+    axios.get(`${API}/rooms`)
       .then(response => setRooms(response.data))
       .catch(error => console.error("Error fetching rooms:", error));
   }, []);
@@ -48,7 +49,7 @@ function LabAssistantDashboard() {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/rooms/${selectedRoom}/timetable`);
+      const response = await axios.get(`${API}/rooms/${selectedRoom}/timetable`);
       console.log(response.data.timetable);
       setTimetable(response.data.timetable || []);
     } catch (error) {
@@ -69,7 +70,7 @@ const handleDeleteRoom = async () => {
   }
   
   try {
-    await axios.delete(`http://localhost:5000/api/rooms/${selectedRoom}`, {
+    await axios.delete(`${API}/rooms/${selectedRoom}`, {
       headers: { Authorization: `Bearer ${user.token}` }
     });
     
@@ -104,7 +105,7 @@ const handleDeleteRoom = async () => {
       };
 
       await axios.put(
-        `http://localhost:5000/api/rooms/${roomName}/schedule/${entryId}`,
+        `${API}/rooms/${roomName}/schedule/${entryId}`,
         { 
           subject: updatedSubject, 
           faculty: updatedFaculty,
@@ -137,7 +138,7 @@ const handleDeleteRoom = async () => {
     if (!window.confirm("Are you sure you want to delete this timetable entry?")) return;
     
     try {
-      await axios.delete(`http://localhost:5000/api/rooms/${roomName}/schedule/${entryId}`, {
+      await axios.delete(`${API}/rooms/${roomName}/schedule/${entryId}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 

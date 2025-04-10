@@ -16,11 +16,14 @@ function Register() {
   const [error, setError] = useState("");
   const { register } = useAuth();
   const navigate = useNavigate();
-
+  // const API=import.meta.env.REACT_APP_API_URL
+  // ;
+  const API="http://localhost:5000/api"
+  console.log(API);
   useEffect(() => {
     const fetchFacultyList = async () => {
       axios
-      .get("http://localhost:5000/api/auth/faculty-list")
+      .get(`${API}/auth/faculty-list`)
       .then((response) => {
         setFacultyList(response.data.facultyList);
       })

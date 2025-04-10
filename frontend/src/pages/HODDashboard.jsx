@@ -38,12 +38,13 @@ function HODDashboard() {
   const [openDialog, setOpenDialog] = useState(false);
   const [facultyToRemove, setFacultyToRemove] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
   useEffect(() => {
     if (!user?.token) return;
 
     axios
-      .get("http://localhost:5000/api/bookings", {
+      .get(`${API}/bookings`, {
         headers: { Authorization: `Bearer ${user.token.trim()}` },
       })
       .then((res) => {
@@ -60,7 +61,7 @@ function HODDashboard() {
 
   const fetchFacultyList = () => {
     axios
-      .get("http://localhost:5000/api/auth/faculty-list", {
+      .get(`${API}/auth/faculty-list`, {
         headers: { Authorization: `Bearer ${user.token.trim()}` },
       })
       .then((res) => {
@@ -76,7 +77,7 @@ function HODDashboard() {
   const handleGrant = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/bookings/hod/grant/${id}`,
+        `${API}/bookings/hod/grant/${id}`,
         {},
         { headers: { Authorization: `Bearer ${user.token.trim()}` } }
       );
@@ -89,7 +90,7 @@ function HODDashboard() {
   const handleReject = async (id) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/bookings/hod/reject/${id}`,
+        `${API}/bookings/hod/reject/${id}`,
         {},
         { headers: { Authorization: `Bearer ${user.token.trim()}` } }
       );
@@ -112,7 +113,7 @@ function HODDashboard() {
 
     try {
       await axios.post(
-        "http://localhost:5000/api/auth/add-faculty",
+        `${API}/auth/add-faculty`,
         newFaculty,
         {
           headers: { Authorization: `Bearer ${user.token.trim()}` },
@@ -138,7 +139,7 @@ function HODDashboard() {
   const handleRemoveFaculty = async () => {
     if (!facultyToRemove) return;
     try {
-      await axios.delete("http://localhost:5000/api/auth/remove-faculty", {
+      await axios.delete(`${API}/auth/remove-faculty`, {
         headers: { Authorization: `Bearer ${user.token.trim()}` },
         data: { name: facultyToRemove.name },
       });

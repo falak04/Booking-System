@@ -4,7 +4,8 @@ import {
   Grid, Alert, CircularProgress
 } from "@mui/material";
 import axios from "axios";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+// import * as XLSX from "xlsx";
 import Navbar from "../components/Navbar";
 
 // Original data from your component
@@ -17,7 +18,8 @@ const facultyNames = [
   "Mr. Suryakant Chaudhari (STC)", "Dr. Gayatri Pandya (GP)", "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)",
   "Ms. Leena Sahu (LS)","Ms. Prahelika Pai (PP)"
 ];
-
+// const API=import.meta.env.REACT_APP_API_URL;
+const API="http://localhost:5000/api"
 // Updated to ensure all days from Monday to Saturday are included
 const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -260,258 +262,114 @@ const AdminTimeTableInput = () => {
     setMessage({ text: "", type: "" });
   };
 
-  const processExcelFile = () => {
+  const processExcelFile = async () => {
     if (!file) {
       setMessage({ text: "Please select a file first", type: "error" });
       return;
     }
-
-    if (!roomName) {
-      setMessage({ text: "Please enter a room name", type: "error" });
+    if (!roomName || !roomType || !capacity || parseInt(capacity) <= 0) {
+      setMessage({ text: "Please complete all room details", type: "error" });
       return;
     }
-
-    if (!roomType) {
-      setMessage({ text: "Please select a room type", type: "error" });
-      return;
-    }
-
-    if (!capacity || parseInt(capacity) <= 0) {
-      setMessage({ text: "Please enter a valid capacity", type: "error" });
-      return;
-    }
-
+  
     setLoading(true);
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Get the merged cells information
-        const mergedCells = worksheet['!merges'] || [];
-        
-        // Get the range of the worksheet
-        const range = XLSX.utils.decode_range(worksheet['!ref']);
-        
-        // Identify header row and columns for days
-        let headerRowIndex = -1;
-        const dayColumnIndices = {};
-        
-        // Find the header row containing days of the week
-        outerLoop:
-        for (let r = range.s.r; r <= Math.min(range.e.r, 10); r++) { // Check only first 10 rows
-          let daysFound = 0;
-          
-          for (let c = range.s.c; c <= range.e.c; c++) {
-            const cellAddress = XLSX.utils.encode_cell({r, c});
-            const cell = worksheet[cellAddress];
-            
-            if (!cell || !cell.v) continue;
-            
-            const cellValue = String(cell.v).trim();
-            
-            // Improved day matching to handle variations in day format
-            daysOfWeek.forEach((day, index) => {
-              if (cellValue.toLowerCase() === day.toLowerCase() || 
-                  cellValue.toLowerCase().includes(day.toLowerCase())) {
-                dayColumnIndices[index] = c;
-                daysFound++;
-              }
-            });
-          }
-          
-          if (daysFound >= 3) { // If we find at least 3 days, this is likely the header row
-            headerRowIndex = r;
-            break outerLoop;
-          }
-        }
-        
-        if (headerRowIndex === -1) {
-          setMessage({ text: "Could not find header row with days of the week", type: "error" });
-          setLoading(false);
-          return;
-        }
-        
-        // DEBUG: Log found day columns
-        console.log("Day columns found:", Object.keys(dayColumnIndices).map(idx => 
-          `${daysOfWeek[idx]} at column ${dayColumnIndices[idx]}`).join(", "));
-        
-        // Find the time/period column
-        let timeColumnIndex = -1;
-        
-        // Look for a column with "PERIOD" or "TIME" header
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const cellAddress = XLSX.utils.encode_cell({r: headerRowIndex, c});
-          const cell = worksheet[cellAddress];
-          
-          if (!cell || !cell.v) continue;
-          
-          const cellValue = String(cell.v).trim().toUpperCase();
-          if (cellValue === "PERIOD" || cellValue === "TIME" || cellValue.includes("TIME") || cellValue.includes("PERIOD")) {
-            timeColumnIndex = c;
-            break;
-          }
-        }
-        
-        // If we couldn't find a labeled time column, look for one with time format
-        if (timeColumnIndex === -1) {
-          for (let c = range.s.c; c <= range.e.c; c++) {
-            // Check the row after header for time formats
-            const cellAddress = XLSX.utils.encode_cell({r: headerRowIndex + 1, c});
-            const cell = worksheet[cellAddress];
-            
-            if (!cell || !cell.v) continue;
-            
-            const cellValue = String(cell.v);
-            if (cellValue.match(/\d{1,2}:\d{2}/)) {
-              timeColumnIndex = c;
-              break;
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file);
+      const worksheet = workbook.worksheets[0];
+  
+      const mergedCells = worksheet._merges;
+      const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  
+      const extractedEntries = [];
+      let headerRowIndex = -1;
+      const dayColumnIndices = {};
+  
+      for (let r = 0; r < 10; r++) {
+        const row = worksheet.getRow(r + 1);
+        let daysFound = 0;
+        row.eachCell((cell, colNumber) => {
+          const val = String(cell.value).trim();
+          daysOfWeek.forEach((day, index) => {
+            if (val.toLowerCase().includes(day.toLowerCase())) {
+              dayColumnIndices[index] = colNumber;
+              daysFound++;
             }
-          }
-        }
-        
-        if (timeColumnIndex === -1) {
-          setMessage({ text: "Could not find time/period column", type: "error" });
-          setLoading(false);
-          return;
-        }
-        
-        // Second pass for days that might not have been found with exact match
-        // This helps with Excel files that might abbreviate days (Thu instead of Thursday)
-        if (Object.keys(dayColumnIndices).length < daysOfWeek.length) {
-          for (let c = range.s.c; c <= range.e.c; c++) {
-            const cellAddress = XLSX.utils.encode_cell({r: headerRowIndex, c});
-            const cell = worksheet[cellAddress];
-            
-            if (!cell || !cell.v) continue;
-            
-            const cellValue = String(cell.v).trim().toLowerCase();
-            
-            // Check for abbreviated/partial matches
-            daysOfWeek.forEach((day, index) => {
-              if (!dayColumnIndices[index] && // Skip if already found
-                  (cellValue.startsWith(day.toLowerCase().substring(0, 3)) || // e.g., "Thu" for "Thursday"
-                   day.toLowerCase().startsWith(cellValue))) { // e.g., "Thursday" for "Thur"
-                dayColumnIndices[index] = c;
-              }
-            });
-          }
-        }
-        
-        // Process the timetable data
-        const extractedEntries = [];
-        
-        // Start from the row after header
-        for (let r = headerRowIndex + 1; r <= range.e.r; r++) {
-          // Get the time slot for this row, handling merged cells
-          const timeSlot = getTimeSlotForRow(worksheet, r, timeColumnIndex);
-          
-          if (!timeSlot) continue; // Skip rows without valid time slots
-          
-          // Process each day column
-          for (let dayIndex = 0; dayIndex < daysOfWeek.length; dayIndex++) {
-            const columnIndex = dayColumnIndices[dayIndex];
-            if (columnIndex === undefined) {
-              // Log when a day is not found
-              console.log(`Column for ${daysOfWeek[dayIndex]} not found in the Excel file`);
-              continue;
-            }
-            
-            // Get cell value for this day, handling merged cells
-            let cellValue = null;
-            const cellAddress = XLSX.utils.encode_cell({r, c: columnIndex});
-            const cell = worksheet[cellAddress];
-            
-            if (cell && cell.v) {
-              cellValue = cell.v;
-            } else {
-              // Check if this cell is part of a merged range
-              for (const merge of mergedCells) {
-                if (r >= merge.s.r && r <= merge.e.r && 
-                    columnIndex >= merge.s.c && columnIndex <= merge.e.c) {
-                  // If it's in a merged range, get the value from the top-left cell
-                  const mergedCellAddress = XLSX.utils.encode_cell({
-                    r: merge.s.r, 
-                    c: merge.s.c
-                  });
-                  const mergedCell = worksheet[mergedCellAddress];
-                  if (mergedCell && mergedCell.v) {
-                    cellValue = mergedCell.v;
-                    break;
-                  }
-                }
-              }
-            }
-            
-            if (!cellValue) continue;
-            
-            try {
-              const parsedCell = parseCellEntry(cellValue);
-              if (!parsedCell) continue;
-              
-              const { subject, facultyCodes, year, division } = parsedCell;
-              const facultyList = findFacultyByCode(facultyCodes);
-              
-              if (subject) {
-                extractedEntries.push({
-                  name: roomName,
-                  day: daysOfWeek[dayIndex],
-                  startTime: timeSlot.startTime,
-                  endTime: timeSlot.endTime,
-                  faculty: facultyList,
-                  subject: subject,
-                  capacity: capacity,
-                  type: roomType,
-                  class: {
-                    year: year,
-                    division: division
-                  }
-                });
-              }
-            } catch (cellError) {
-              console.warn("Error processing cell:", cellValue, cellError);
-              // Continue with other cells even if one fails
-            }
-          }
-        }
-        
-        // Merge consecutive time slots
-        const mergedEntries = mergeConsecutiveSlots(extractedEntries);
-        
-        // Group by day to verify all days have data
-        const entriesByDay = {};
-        daysOfWeek.forEach(day => {
-          entriesByDay[day] = mergedEntries.filter(entry => entry.day === day);
+          });
         });
-        
-        console.log("Entries by day:", Object.keys(entriesByDay).map(day => 
-          `${day}: ${entriesByDay[day].length} entries`).join(", "));
-        
-        setExtractedData(mergedEntries);
-        setMessage({ 
-          text: `Successfully extracted ${extractedEntries.length} entries and merged into ${mergedEntries.length} entries`, 
-          type: "success" 
-        });
-      } catch (error) {
-        console.error("Error processing Excel file:", error);
-        setMessage({ text: "Error processing Excel file: " + error.message, type: "error" });
-      } finally {
-        setLoading(false);
+        if (daysFound >= 3) {
+          headerRowIndex = r + 1;
+          break;
+        }
       }
-    };
-    
-    reader.onerror = () => {
-      setMessage({ text: "Error reading file", type: "error" });
+  
+      if (headerRowIndex === -1) {
+        setMessage({ text: "Could not find header row with days of the week", type: "error" });
+        setLoading(false);
+        return;
+      }
+  
+      let timeColumnIndex = -1;
+      worksheet.getRow(headerRowIndex).eachCell((cell, colNumber) => {
+        const value = String(cell.value || '').toUpperCase();
+        if (value.includes("TIME") || value.includes("PERIOD")) {
+          timeColumnIndex = colNumber;
+        }
+      });
+  
+      if (timeColumnIndex === -1) {
+        setMessage({ text: "Could not find time/period column", type: "error" });
+        setLoading(false);
+        return;
+      }
+  
+      for (let r = headerRowIndex + 1; r <= worksheet.rowCount; r++) {
+        const row = worksheet.getRow(r);
+        const timeSlot = row.getCell(timeColumnIndex).value;
+        if (!timeSlot) continue;
+  
+        for (let dayIndex in dayColumnIndices) {
+          const colIndex = dayColumnIndices[dayIndex];
+          const cell = row.getCell(colIndex);
+          const value = cell.value;
+          if (!value) continue;
+  
+          // (use parseCellEntry and other helpers from original file)
+          const parsedCell = parseCellEntry(value);
+          if (!parsedCell) continue;
+  
+          const { subject, facultyCodes, year, division } = parsedCell;
+          const facultyList = findFacultyByCode(facultyCodes);
+          const { startTime, endTime } = parseTimeSlot(timeSlot);
+  
+          extractedEntries.push({
+            name: roomName,
+            day: daysOfWeek[dayIndex],
+            startTime,
+            endTime,
+            faculty: facultyList,
+            subject,
+            capacity,
+            type: roomType,
+            class: { year, division }
+          });
+        }
+      }
+  
+      const mergedEntries = mergeConsecutiveSlots(extractedEntries);
+      setExtractedData(mergedEntries);
+      setMessage({ 
+        text: `Successfully extracted ${extractedEntries.length} entries and merged into ${mergedEntries.length} entries`, 
+        type: "success" 
+      });
+    } catch (error) {
+      console.error("Error processing Excel file:", error);
+      setMessage({ text: "Error processing Excel file: " + error.message, type: "error" });
+    } finally {
       setLoading(false);
-    };
-    
-    reader.readAsArrayBuffer(file);
+    }
   };
-
+  
   const handleSubmitAll = async () => {
     if (extractedData.length === 0) {
       setMessage({ text: "No data to submit", type: "error" });
@@ -526,7 +384,7 @@ const AdminTimeTableInput = () => {
     
     for (const entry of extractedData) {
       try {
-        await axios.post("http://localhost:5000/api/rooms/add", entry, {
+        await axios.post(`${API}/rooms/add`, entry, {
           headers: { "Content-Type": "application/json" },
         });
         successCount++;

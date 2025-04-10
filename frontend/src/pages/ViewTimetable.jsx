@@ -1,421 +1,563 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { 
-  Container, TextField, Button, Typography, 
-  Paper, Box, Stack, TableContainer, CircularProgress
+  Container, Typography, Paper, Box, Stack, IconButton, 
+  Grid, CircularProgress, Chip, Select, MenuItem, FormControl, InputLabel
 } from "@mui/material";
+import { 
+  ChevronLeft, ChevronRight, CalendarMonth, 
+  AccessTime, Room
+} from "@mui/icons-material";
 import Navbar from "../components/Navbar";
 
 const ViewTimetable = () => {
-  const [roomName, setRoomName] = useState("");
-  const [schedule, setSchedule] = useState([]);
-  const [error, setError] = useState("");
+  // State variables
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState("");
+  const [roomData, setRoomData] = useState(null);
+  const [currentWeekStart, setCurrentWeekStart] = useState(new Date());
   const [loading, setLoading] = useState(false);
-
-  // Time slots matching the PDF format
+  const [error, setError] = useState("");
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
+  // Time slots for the day
   const timeSlots = [
-    { id: 1, time: "08:00-08:30" },
-    { id: 2, time: "08:30-09:00" },
-    { id: 3, time: "09:00-09:30" },
-    { id: 4, time: "09:30-10:00" },
-    { id: 5, time: "10:00-10:30" },
-    { id: 6, time: "10:30-11:00" },
-    { id: 7, time: "11:00-11:30" },
-    { id: 8, time: "11:30-12:00" },
-    { id: 9, time: "12:00-12:30" },
-    { id: 10, time: "12:30-01:00" },
-    { id: 11, time: "01:00-01:30" },
-    { id: 12, time: "01:30-02:00" },
-    { id: 13, time: "02:00-02:30" },
-    { id: 14, time: "02:30-03:00" },
-    { id: 15, time: "03:00-03:30" },
-    { id: 16, time: "03:30-04:00" },
-    { id: 17, time: "04:00-04:30" },
-    { id: 18, time: "04:30-05:00" },
-    { id: 19, time: "05:00-05:30" }
+    "08:00-08:30", "08:30-09:00", "09:00-09:30", "09:30-10:00",
+    "10:00-10:30", "10:30-11:00", "11:00-11:30", "11:30-12:00",
+    "12:00-12:30", "12:30-13:00", "13:00-13:30", "13:30-14:00",
+    "14:00-14:30", "14:30-15:00", "15:00-15:30", "15:30-16:00",
+    "16:00-16:30", "16:30-17:00", "17:00-17:30"
   ];
 
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  // Calculate the column width as a percentage
-  const dayColumnWidth = `${100 / (days.length + 2)}%`; // +2 for the period number and time columns
+  // Days of the week
+  const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   // Status colors for different approval states
   const statusColors = {
     pendingApproval: {
       background: "#FFF9C4", // Light yellow
-      text: "#F57F17"        // Dark amber for text
+      text: "#F57F17",       // Dark amber for text
+      border: "#FFD54F"      // Amber border
     },
     approved: {
       background: "#FFE0B2", // Light orange
-      text: "#E65100"        // Dark orange for text
+      text: "#E65100",       // Dark orange for text
+      border: "#FFB74D"      // Orange border
     },
     granted: {
       background: "#E8F5E9", // Light green
-      text: "#2E7D32"        // Dark green for text
+      text: "#2E7D32",       // Dark green for text
+      border: "#A5D6A7"      // Green border
     },
     default: {
-      background: "#E6E6FA", // Light purple (original color)
-      text: "#4B0082"        // Indigo for text (original color)
+      background: "#E6E6FA", // Light purple
+      text: "#4B0082",       // Indigo for text
+      border: "#9FA8DA"      // Indigo border
     }
   };
 
-  const fetchTimetable = async () => {
-    if (!roomName.trim()) {
-      setError("Please enter a room name");
-      return;
+  // Fetch all available rooms when component mounts
+  useEffect(() => {
+    async function fetchRooms() {
+      try {
+        const response = await axios.get(`${API}/rooms`);
+        setRooms(response.data);
+      } catch (err) {
+        console.error("Error fetching rooms:", err);
+        setError("Failed to load rooms. Please try again later.");
+      }
     }
+    
+    fetchRooms();
+    
+    // Set current week to start on Monday
+    adjustToMonday(new Date());
+  }, []);
 
+  // Adjust date to the Monday of its week
+  const adjustToMonday = (date) => {
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    const monday = new Date(date);
+    monday.setDate(diff);
+    setCurrentWeekStart(monday);
+  };
+
+  // Handle room selection change
+  const handleRoomChange = (event) => {
+    setSelectedRoom(event.target.value);
+    fetchRoomData(event.target.value);
+  };
+
+  // Fetch room data including schedule
+  const fetchRoomData = async (roomName) => {
+    if (!roomName) return;
+    
     setLoading(true);
     setError("");
     
     try {
-      const response = await axios.get(`http://localhost:5000/api/rooms/${roomName}/timetable`);
-      console.log(response.data.timetable);
-      setSchedule(response.data.timetable || []);
+      const response = await axios.get(`${API}/rooms/${roomName}/timetable`);
+      setRoomData({
+        name: roomName,
+        schedule: response.data.timetable || []
+      });
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 
+      const errorMessage = err.response?.data?.error || 
                           "Room not found or no timetable available.";
       setError(errorMessage);
-      setSchedule([]);
+      setRoomData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Improved time string to index conversion with special handling for 05:30
-  const timeToIndex = (timeStr) => {
-    // Special case for "05:30" as it's the end time of the last slot
-    if (timeStr === "05:30") {
-      return timeSlots.length; // Return the index after the last slot
-    }
-    
-    // Convert time to a standardized format for comparison
-    let hour = parseInt(timeStr.split(':')[0]);
-    const minute = timeStr.split(':')[1];
-    
-    // Handle 12-hour format for afternoon times
-    if (hour <= 5) {
-      hour += 12; // Convert to 24-hour format
-    }
-    
-    // Format to match the timeSlots format
-    const formattedTime = hour < 10 ? `0${hour}:${minute}` : `${hour}:${minute}`;
-    
-    // Find matching time slot
-    for (let i = 0; i < timeSlots.length; i++) {
-      const slotStart = timeSlots[i].time.split('-')[0];
-      
-      // Convert slot time for comparison if it's in 12-hour format
-      let slotHour = parseInt(slotStart.split(':')[0]);
-      if (slotStart.includes('0') && slotHour <= 5) {
-        slotHour += 12;
-      }
-      
-      const slotMinute = slotStart.split(':')[1];
-      const slotFormatted = slotHour < 10 ? `0${slotHour}:${slotMinute}` : `${slotHour}:${slotMinute}`;
-      
-      if (formattedTime === slotFormatted || slotStart === timeStr) {
-        return i;
-      }
-    }
-    return -1;
+  // Navigate to previous week
+  const goToPreviousWeek = () => {
+    const newDate = new Date(currentWeekStart);
+    newDate.setDate(newDate.getDate() - 7);
+    setCurrentWeekStart(newDate);
   };
 
-  // Get cell colors based on approval status
-  const getCellColors = (approvalStatus) => {
-    switch(approvalStatus) {
-      case "pendingApproval":
-        return statusColors.pendingApproval;
-      case "approved":
-        return statusColors.approved;
-      case "granted":
-        return statusColors.granted;
-      default:
-        return statusColors.default;
+  // Navigate to next week
+  const goToNextWeek = () => {
+    const newDate = new Date(currentWeekStart);
+    newDate.setDate(newDate.getDate() + 7);
+    setCurrentWeekStart(newDate);
+  };
+
+  // Get date string for a specific day in the current week
+  const getDateString = (dayIndex) => {
+    const date = new Date(currentWeekStart);
+    date.setDate(date.getDate() + dayIndex);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Get Date object for a specific day in the current week
+  const getDateForDay = (dayIndex) => {
+    const date = new Date(currentWeekStart);
+    date.setDate(date.getDate() + dayIndex);
+    return date;
+  };
+
+  // Format week range for display
+  const getWeekRangeDisplay = () => {
+    const endDate = new Date(currentWeekStart);
+    endDate.setDate(endDate.getDate() + 5); // Saturday (6 days including Monday)
+    
+    const startMonth = currentWeekStart.toLocaleDateString('en-US', { month: 'short' });
+    const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+    
+    const startDay = currentWeekStart.getDate();
+    const endDay = endDate.getDate();
+    
+    const startYear = currentWeekStart.getFullYear();
+    const endYear = endDate.getFullYear();
+    
+    if (startYear !== endYear) {
+      return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`;
+    } else if (startMonth !== endMonth) {
+      return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`;
+    } else {
+      return `${startMonth} ${startDay} - ${endDay}, ${startYear}`;
     }
   };
 
-  // Generate the timetable HTML
-  const renderTimetable = () => {
-    if (schedule.length === 0) return null;
+  // Check if two entries are identical for merging purposes
+  const areEntriesIdentical = (entry1, entry2) => {
+    if (!entry1 || !entry2) return false;
+    
+    return (
+      entry1.subject === entry2.subject &&
+      entry1.approvalStatus === entry2.approvalStatus &&
+      JSON.stringify(entry1.faculty) === JSON.stringify(entry2.faculty) &&
+      JSON.stringify(entry1.class) === JSON.stringify(entry2.class)
+    );
+  };
 
-    // Create a grid to track occupied cells
-    const cellOccupied = {};
-    days.forEach(day => {
-      cellOccupied[day] = Array(timeSlots.length).fill(false);
+  // Check if a date matches the entry's date (if applicable)
+  const matchesEntryDate = (entry, currentDate) => {
+    // If approvalStatus is default, always show the entry
+    if (entry.approvalStatus === "default") {
+      return true;
+    }
+    
+    // If approvalStatus is NOT default, only show on specific date
+    if (entry.date) {
+      const entryDate = new Date(entry.date);
+      return (
+        currentDate.getFullYear() === entryDate.getFullYear() &&
+        currentDate.getMonth() === entryDate.getMonth() &&
+        currentDate.getDate() === entryDate.getDate()
+      );
+    }
+    
+    return false; // Don't show entries with non-default status and no date
+  };
+
+  // Find schedule entries for a specific day and time slot
+  const findScheduleEntries = (day, timeSlot, dayIndex) => {
+    if (!roomData || !roomData.schedule) return null;
+    
+    // Parse the time slot correctly
+    const [startTimeSlot, endTimeSlot] = timeSlot.split('-');
+    
+    // Get the date for this day
+    const currentDate = getDateForDay(dayIndex);
+    
+    return roomData.schedule.filter(entry => {
+      // First check if this entry matches the day and time slot
+      const matchesSlot = (
+        entry.day === day &&
+        ((entry.startTime <= startTimeSlot && entry.endTime > startTimeSlot) || 
+         (entry.startTime >= startTimeSlot && entry.startTime < endTimeSlot))
+      );
+      
+      // Then check if this entry should be shown on the current date
+      return matchesSlot && matchesEntryDate(entry, currentDate);
     });
+  };
 
-    // Process schedule data
-    const classEntries = [];
-    schedule.forEach(entry => {
-      const day = entry.day;
-      if (!days.includes(day)) return;
+  // Process timetable data to identify mergeable slots
+  const processTimeTable = () => {
+    const mergeData = {};
+    
+    weekDays.forEach((day, dayIndex) => {
+      mergeData[day] = [];
       
-      const startIndex = timeToIndex(entry.startTime);
-      let endIndex = timeToIndex(entry.endTime);
+      let currentGroup = null;
       
-      // Skip invalid entries
-      if (startIndex === -1) return;
-      
-      // Handle end time special cases
-      if (endIndex > startIndex) {
-        endIndex = endIndex - 1;
-      }
-      
-      // Handle the case where endIndex is still -1 after adjustment
-      if (endIndex === -1) {
-        // If we couldn't find a valid end index, use the last slot
-        endIndex = timeSlots.length - 1;
-      }
-      
-      classEntries.push({
-        day,
-        startIndex,
-        endIndex,
-        rowSpan: endIndex - startIndex + 1,
-        subject: entry.subject,
-        faculty: entry.faculty || "",
-        approvalStatus: entry.approvalStatus || "default", // Use default if not specified
-        class: entry.class || {} // Add class information
+      timeSlots.forEach((slot, slotIndex) => {
+        const entries = findScheduleEntries(day, slot, dayIndex);
+        const entry = entries && entries.length > 0 ? entries[0] : null;
+        
+        if (!entry) {
+          if (currentGroup) {
+            mergeData[day].push(currentGroup);
+            currentGroup = null;
+          }
+          // Push an empty slot
+          mergeData[day].push({
+            startIndex: slotIndex,
+            endIndex: slotIndex,
+            entry: null,
+            span: 1
+          });
+        } else {
+          if (currentGroup && areEntriesIdentical(currentGroup.entry, entry)) {
+            // Extend current group
+            currentGroup.endIndex = slotIndex;
+            currentGroup.span = currentGroup.endIndex - currentGroup.startIndex + 1;
+          } else {
+            // End current group if exists
+            if (currentGroup) {
+              mergeData[day].push(currentGroup);
+            }
+            // Start new group
+            currentGroup = {
+              startIndex: slotIndex,
+              endIndex: slotIndex,
+              entry: entry,
+              span: 1
+            };
+          }
+        }
       });
       
-      // Mark cells as occupied
-      for (let i = startIndex; i <= endIndex; i++) {
-        cellOccupied[day][i] = true;
+      // Add the last group if exists
+      if (currentGroup) {
+        mergeData[day].push(currentGroup);
       }
     });
+    
+    return mergeData;
+  };
 
-    // Table styles
-    const tableStyles = {
-      width: '100%',
-      tableLayout: 'fixed', // This ensures equal column widths
-      borderCollapse: 'collapse',
-      fontSize: '0.75rem',
-      border: '1px solid #ddd',
-    };
+  // Get approval status label
+  const getStatusLabel = (status) => {
+    switch(status) {
+      case "pendingApproval": return "Pending";
+      case "approved": return "Approved";
+      case "granted": return "Granted";
+      default: return "Regular";
+    }
+  };
 
-    // Cell styles
-    const cellStyles = {
-      padding: '2px 4px',
-      textAlign: 'center',
-      border: '1px solid #ddd',
-      overflow: 'hidden', // Prevent text overflow
-      textOverflow: 'ellipsis', // Show ellipsis for overflowing text
-      wordWrap: 'break-word' // Break words when necessary
-    };
+  // Format date for display in the cell
+  const formatDateDisplay = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
-    // Fix for colgroup whitespace issue - use React.createElement instead of JSX
-    const colgroup = React.createElement(
-      'colgroup',
-      null,
-      React.createElement('col', { style: { width: '5%' } }),
-      React.createElement('col', { style: { width: '10%' } }),
-      ...days.map((day, index) => 
-        React.createElement('col', { key: index, style: { width: dayColumnWidth } })
-      )
-    );
-
+  // Render cell content based on schedule entry
+  const renderCellContent = (entry) => {
+    if (!entry) return null;
+    
+    const colors = statusColors[entry.approvalStatus || "default"];
+    
     return (
-      <table className="timetable" style={tableStyles}>
-        {colgroup}
-        <thead>
-          <tr>
-            <th style={{ ...cellStyles, fontWeight: 'bold' }}>No.</th>
-            <th style={{ ...cellStyles, fontWeight: 'bold' }}>PERIOD</th>
-            {days.map(day => (
-              <th key={day} style={{ ...cellStyles, fontWeight: 'bold' }}>
-                {day}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {timeSlots.map((slot, rowIndex) => (
-            <tr key={slot.id} style={{ height: '30px' }}>
-              <td style={{ ...cellStyles, fontSize: '0.7rem' }}>{slot.id}</td>
-              <td style={{ ...cellStyles, fontSize: '0.7rem' }}>{slot.time}</td>
-              
-              {days.map((day, colIndex) => {
-                // Check if this cell is the start of a class entry
-                const classEntry = classEntries.find(
-                  entry => entry.day === day && entry.startIndex === rowIndex
-                );
-                
-                // Check if this cell is part of a class but not the start
-                const isOccupied = cellOccupied[day][rowIndex];
-                
-                // If cell is part of a class but not the start, don't render it
-                if (isOccupied && !classEntry) {
-                  return null;
-                }
-                
-                // Render class cell or empty cell
-                if (classEntry) {
-                  // Get colors based on approval status
-                  const colors = getCellColors(classEntry.approvalStatus);
-                  
-                  return (
-                    <td 
-                      key={`${day}-${rowIndex}`}
-                      rowSpan={classEntry.rowSpan}
-                      style={{
-                        ...cellStyles,
-                        backgroundColor: colors.background,
-                        color: colors.text,
-                        verticalAlign: 'middle'
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold', fontSize: '0.7rem', lineHeight: 1.1 }}>
-                        {classEntry.subject}
-                      </div>
-                      <div>
-                        {Array.isArray(classEntry.faculty) 
-                          ? `(${classEntry.faculty.join(', ')})`
-                          : `(${classEntry.faculty})`}
-                      </div>
-                      {/* Add class year and division information */}
-                      {classEntry.class && (classEntry.class.year || classEntry.class.division) && (
-                        <div style={{ marginTop: '2px' }}>
-                          {classEntry.class.year && classEntry.class.division 
-                            ? `${classEntry.class.year}-${classEntry.class.division}`
-                            : classEntry.class.year || classEntry.class.division}
-                        </div>
-                      )}
-                    </td>
-                  );
-                }
-                
-                // Empty cell
-                return (
-                  <td 
-                    key={`${day}-${rowIndex}`}
-                    style={cellStyles}
-                  ></td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Box 
+        sx={{ 
+          height: '100%',
+          p: 1,
+          backgroundColor: colors.background,
+          color: colors.text,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 1,
+          overflow: 'hidden',
+          fontSize: '0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative'
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, lineHeight: 1.2 }}>
+          {entry.subject}
+        </Typography>
+        
+        <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+          {Array.isArray(entry.faculty) 
+            ? entry.faculty.join(', ')
+            : entry.faculty}
+        </Typography>
+        
+        {entry.class && (entry.class.year || entry.class.division) && (
+          <Typography variant="caption" sx={{ mt: 0.5, fontSize: '0.7rem' }}>
+            {entry.class.year && entry.class.division 
+              ? `${entry.class.year}-${entry.class.division}`
+              : entry.class.year || entry.class.division}
+          </Typography>
+        )}
+        
+        {entry.approvalStatus && entry.approvalStatus !== "default" && (
+          <Box sx={{ mt: 0.5 }}>
+            <Chip 
+              label={getStatusLabel(entry.approvalStatus)}
+              size="small"
+              sx={{ 
+                height: 16,
+                fontSize: '0.6rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                color: colors.text,
+                mr: 0.5
+              }}
+            />
+            {entry.date && (
+              <Chip 
+                label={formatDateDisplay(entry.date)}
+                size="small"
+                sx={{ 
+                  height: 16,
+                  fontSize: '0.6rem',
+                  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                  color: colors.text
+                }}
+              />
+            )}
+          </Box>
+        )}
+      </Box>
     );
   };
 
-  // Legend for the approval status colors
-  const renderLegend = () => {
+  // Determine if the current date is today
+  const isToday = (dayIndex) => {
+    const today = new Date();
+    const compareDate = new Date(currentWeekStart);
+    compareDate.setDate(compareDate.getDate() + dayIndex);
+    
     return (
-      <Box sx={{ mt: 2, mb: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box 
-            sx={{ 
-              width: 16, 
-              height: 16, 
-              backgroundColor: statusColors.pendingApproval.background, 
-              border: '1px solid #ccc', 
-              mr: 1 
-            }} 
-          />
-          <Typography variant="caption">Pending Approval</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box 
-            sx={{ 
-              width: 16, 
-              height: 16, 
-              backgroundColor: statusColors.approved.background, 
-              border: '1px solid #ccc', 
-              mr: 1 
-            }} 
-          />
-          <Typography variant="caption">Approved by Admin</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box 
-            sx={{ 
-              width: 16, 
-              height: 16, 
-              backgroundColor: statusColors.granted.background, 
-              border: '1px solid #ccc', 
-              mr: 1 
-            }} 
-          />
-          <Typography variant="caption">Granted Approval</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box 
-            sx={{ 
-              width: 16, 
-              height: 16, 
-              backgroundColor: statusColors.default.background, 
-              border: '1px solid #ccc', 
-              mr: 1 
-            }} 
-          />
-          <Typography variant="caption">Default</Typography>
-        </Box>
-      </Box>
+      today.getDate() === compareDate.getDate() &&
+      today.getMonth() === compareDate.getMonth() &&
+      today.getFullYear() === compareDate.getFullYear()
     );
   };
 
   return (
     <>
       <Navbar />
-      <Container maxWidth="lg">
-        <Box sx={{ mt: 3, mb: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <TextField
-              label="Enter Room Name"
-              variant="outlined"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              size="small"
-              disabled={loading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') fetchTimetable();
-              }}
-            />
-            <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={fetchTimetable}
-              sx={{ 
-                backgroundColor: "#2c3e50", 
-                color: "white", 
-                marginLeft:4,
-                padding: "12px 12px",
-                marginTop:2,
-                marginBottom: 2,
-                borderRadius: 1,
-                textTransform: "none",
-                fontSize: "0.9rem",
-                "&:hover": {
-                  backgroundColor: "#1a2530"
-                }
-              }}
-              size="medium"
-              disabled={loading}
-              startIcon={loading && <CircularProgress size={20} color="inherit" />}
-            >
-              {loading ? "Loading..." : "Fetch Timetable"}
-            </Button>
+      <Container maxWidth="lg" sx={{ mt: 3, mb: 5 }}>
+        <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+          {/* Header with room selector */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
+              Room Timetable
+            </Typography>
+            
+            <FormControl sx={{ minWidth: 200 }}>
+              <InputLabel id="room-select-label">Select Room</InputLabel>
+              <Select
+                labelId="room-select-label"
+                value={selectedRoom}
+                label="Select Room"
+                onChange={handleRoomChange}
+                size="small"
+              >
+                <MenuItem value=""><em>Select a room</em></MenuItem>
+                {rooms.map(room => (
+                  <MenuItem key={room.name} value={room.name}>
+                    {room.name} ({room.type})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
           
+          {/* Room info and week navigation */}
+          {selectedRoom && (
+            <Box mb={2}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box display="flex" alignItems="center">
+                  <Room sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                    {selectedRoom} {roomData && `(Capacity: ${rooms.find(r => r.name === selectedRoom)?.capacity || '-'})`}
+                  </Typography>
+                </Box>
+                
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <IconButton onClick={goToPreviousWeek} size="small">
+                    <ChevronLeft />
+                  </IconButton>
+                  
+                  <Box display="flex" alignItems="center">
+                    <CalendarMonth sx={{ mr: 1, color: 'primary.main' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                      {getWeekRangeDisplay()}
+                    </Typography>
+                  </Box>
+                  
+                  <IconButton onClick={goToNextWeek} size="small">
+                    <ChevronRight />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </Box>
+          )}
+          
+          {/* Error message */}
           {error && (
-            <Typography color="error" sx={{ mt: 1 }} variant="body2">
+            <Typography color="error" sx={{ mt: 1, mb: 2 }} variant="body2">
               {error}
             </Typography>
           )}
-        </Box>
-
-        {schedule.length > 0 && (
-          <Box sx={{ mt: 1,mb:2 }}>
-            {renderLegend()}
-            
-            <TableContainer component={Paper} sx={{ mt: 1,marginBottom:2}}>
-              {renderTimetable()}
-            </TableContainer>
-          </Box>
-        )}
+          
+          {/* Loading indicator */}
+          {loading && (
+            <Box display="flex" justifyContent="center" my={4}>
+              <CircularProgress />
+            </Box>
+          )}
+          
+          {/* Calendar timetable grid */}
+          {selectedRoom && roomData && !loading && (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Grid container sx={{ minWidth: 900 }}>
+                {/* Time column */}
+                <Grid item xs={1} sx={{ borderRight: '1px solid #e0e0e0' }}>
+                  <Box sx={{ 
+                    height: 50, 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderBottom: '1px solid #e0e0e0',
+                    backgroundColor: '#f5f5f5'
+                  }}>
+                    <AccessTime fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </Box>
+                  
+                  {timeSlots.map((slot, index) => (
+                    <Box key={index} sx={{ 
+                      height: 80, 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      p: 1,
+                      borderBottom: '1px solid #e0e0e0',
+                      fontSize: '0.75rem'
+                    }}>
+                      {slot}
+                    </Box>
+                  ))}
+                </Grid>
+                
+                {/* Days columns */}
+                {weekDays.map((day, dayIndex) => {
+                  const mergedData = roomData ? processTimeTable()[day] : [];
+                  
+                  return (
+                    <Grid item xs={1.8} key={day} sx={{ borderRight: '1px solid #e0e0e0' }}>
+                      {/* Day header */}
+                      <Box sx={{ 
+                        height: 50, 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderBottom: '1px solid #e0e0e0',
+                        backgroundColor: isToday(dayIndex) ? 'primary.light' : '#f5f5f5',
+                        color: isToday(dayIndex) ? 'primary.contrastText' : 'inherit'
+                      }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                          {day}
+                        </Typography>
+                        <Typography variant="caption">
+                          {getDateString(dayIndex)}
+                        </Typography>
+                      </Box>
+                      
+                      {/* Merged time slots for this day */}
+                      {mergedData.map((slot, slotIndex) => (
+                        <Box 
+                          key={`${day}-${slotIndex}`} 
+                          sx={{ 
+                            height: slot.span * 80, 
+                            p: 0.5,
+                            borderBottom: '1px solid #e0e0e0',
+                            backgroundColor: slot.entry ? 'transparent' : 'white',
+                            '&:hover': {
+                              backgroundColor: slot.entry ? 'transparent' : '#f9f9f9'
+                            }
+                          }}
+                        >
+                          {renderCellContent(slot.entry)}
+                        </Box>
+                      ))}
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </Box>
+          )}
+          
+          {/* Legend for approval status */}
+          {selectedRoom && roomData && !loading && (
+            <Box sx={{ mt: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="body2" sx={{ mr: 1 }}>
+                Status Legend:
+              </Typography>
+              
+              {Object.entries(statusColors).map(([status, colors]) => (
+                <Box key={status} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box 
+                    sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      backgroundColor: colors.background,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '2px',
+                      mr: 0.5
+                    }} 
+                  />
+                  <Typography variant="caption">
+                    {status === "pendingApproval" ? "Pending Approval" : 
+                     status === "approved" ? "Approved by Admin" :
+                     status === "granted" ? "Granted Approval" : "Default"}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Paper>
       </Container>
     </>
   );

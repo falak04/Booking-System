@@ -6,9 +6,10 @@ import { Container, Typography, Button, Table, TableBody, TableCell, TableHead, 
 function Bookings() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
   useEffect(() => {
-    axios.get("http://localhost:5000/api/bookings", {
+    axios.get(`${API}/bookings`, {
       headers: { Authorization: user?.token },
     })
     .then(response => setBookings(response.data))
@@ -16,14 +17,14 @@ function Bookings() {
   }, []);
 
   const handleApprove = async (id) => {
-    await axios.put(`http://localhost:5000/api/bookings/${id}/approve`, { status: "approved" }, {
+    await axios.put(`${API}/bookings/${id}/approve`, { status: "approved" }, {
       headers: { Authorization: user?.token },
     });
     alert("Booking Approved by Admin. Awaiting HOD approval.");
   };
 
   const handleGrant = async (id) => {
-    await axios.put(`http://localhost:5000/api/bookings/${id}/grant`, { grantStatus: "granted" }, {
+    await axios.put(`${API}/bookings/${id}/grant`, { grantStatus: "granted" }, {
       headers: { Authorization: user?.token },
     });
     alert("Booking Granted by HOD.");

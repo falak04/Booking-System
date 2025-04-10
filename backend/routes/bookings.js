@@ -39,6 +39,7 @@ async function removeExpiredBookings() {
           
           // Get the day of week from the booking date
           const bookingDate = new Date(booking.date);
+          const date=bookingDate.toISOString().split('T')[0];
           const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
           const bookingDay = daysOfWeek[bookingDate.getDay()]; 
           
@@ -49,6 +50,7 @@ async function removeExpiredBookings() {
           room.schedule = room.schedule.filter(entry => {
             // Keep all entries that don't match the exact booking parameters
             return !(
+              entry.date.toISOString().split('T')[0]===date&&
               entry.day === bookingDay && 
               entry.startTime === startTime && 
               entry.endTime === endTime &&
@@ -69,7 +71,7 @@ async function removeExpiredBookings() {
         }
         
         // Delete the expired booking document
-        await Booking.findByIdAndDelete(booking._id);
+        // await Booking.findByIdAndDelete(booking._id);
         cleanupCount++;
         
       } catch (error) {
@@ -165,7 +167,8 @@ router.post("/", authenticateUser, async (req, res) => {
       endTime,
       subject: "Pending Approval",
       faculty: req.user.name,
-      approvalStatus: "pendingApproval"
+      approvalStatus: "pendingApproval",
+      date
       // Assigning booking requester's name
     });
     
@@ -182,7 +185,7 @@ router.post("/", authenticateUser, async (req, res) => {
 // 📌 Get All Bookings (For Admin & HOD)
 router.get("/", authenticateUser, authorizeRole(["Admin", "HOD"]), async (req, res) => {
   try {
-    await removeExpiredBookings();
+    // await removeExpiredBookings();
     const bookings = await Booking.find().populate("teacher", "name email");
     res.json(bookings);
   } catch (error) {
@@ -210,12 +213,15 @@ router.put("/admin/approve/:id", authenticateUser, authorizeRole(["Admin"]), asy
 
       // ✅ **Convert booking.date to the corresponding day**
       const bookingDate = new Date(booking.date);
+      const date=bookingDate.toISOString().split('T')[0];
+      // console.log(date);
       const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const bookingDay = daysOfWeek[bookingDate.getUTCDay()]; // Ensure correct day conversion
 
       // ✅ **Update the Subject in Schedule**
       room.schedule = room.schedule.map((entry) => {
-        if (entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime) {
+        if (entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime &&entry.date.toISOString().split('T')[0]===date) {
+          // console.log(entry.date);
           return { ...entry, subject: "Approved by Admin" ,approvalStatus:"approved"}; // Update subject
         }
         return entry;
@@ -261,12 +267,13 @@ router.put("/admin/reject/:id", authenticateUser, authorizeRole(["Admin"]), asyn
 
       // ✅ **Convert booking.date to the corresponding day**
       const bookingDate = new Date(booking.date);
+      const date=bookingDate.toISOString().split('T')[0];
       const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const bookingDay = daysOfWeek[bookingDate.getUTCDay()]; // Ensure correct day conversion
 
       // ✅ **Filter out the rejected slot**
       room.schedule = room.schedule.filter(
-        (entry) => !(entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime)
+        (entry) => !(entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime&&entry.date.toISOString().split('T')[0]===date)
       );
 
       console.log("✅ Updated Room Schedule:", room.schedule);
@@ -311,12 +318,13 @@ router.put("/hod/grant/:id", authenticateUser, authorizeRole(["HOD"]), async (re
 
       // ✅ Convert booking.date to weekday
       const bookingDate = new Date(booking.date);
+      const date=bookingDate.toISOString().split('T')[0];
       const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const bookingDay = daysOfWeek[bookingDate.getUTCDay()];
 
       // ✅ Update schedule with final subject and faculty
       room.schedule = room.schedule.map((entry) => {
-        if (entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime) {
+        if (entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime&&entry.date.toISOString().split('T')[0]===date) {
           return { ...entry, subject: booking.purpose, faculty: booking.teacher.name,approvalStatus:"granted" }; // Update subject & faculty
         }
         return entry;
@@ -356,12 +364,13 @@ router.put("/hod/reject/:id", authenticateUser, authorizeRole(["HOD"]), async (r
 
       // ✅ **Convert booking.date to the corresponding day**
       const bookingDate = new Date(booking.date);
+      const date=bookingDate.toISOString().split('T')[0];
       const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const bookingDay = daysOfWeek[bookingDate.getUTCDay()]; // Ensure correct day conversion
 
       // ✅ **Filter out the rejected slot**
       room.schedule = room.schedule.filter(
-        (entry) => !(entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime)
+        (entry) => !(entry.day === bookingDay && entry.startTime === startTime && entry.endTime === endTime&&entry.date.toISOString().split('T')[0]===date)
       );
 
       console.log("✅ Updated Room Schedule:", room.schedule);

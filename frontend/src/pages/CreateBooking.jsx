@@ -13,7 +13,8 @@ import Navbar from "../components/Navbar";
 function CreateBooking() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
+  // const API=import.meta.env.REACT_APP_API_URL;
+  const API="http://localhost:5000/api"
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState("Monday");
   const [availableRooms, setAvailableRooms] = useState({});
@@ -32,18 +33,20 @@ function CreateBooking() {
 
   // Fetch available rooms along with time slots on the selected day
   useEffect(() => {
-    if (selectedDay) {
-      if(selectedDay!="Sunday")
-      {
-      axios.get(`http://localhost:5000/api/rooms/available?day=${selectedDay}`)
+    if(selectedDay !== "Sunday") {
+      // Create a date parameter from the currently selected date
+      const formattedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : null;
+      
+      axios.get(`${API}/rooms/available?day=${selectedDay}&date=${formattedDate}`)
         .then(response => {
           console.log("Available Rooms:", response.data);
           setAvailableRooms(response.data);
         })
-      
-        .catch(error => console.error("Error fetching rooms:", error));
-    }}
-  }, [selectedDay]);
+        .catch(error => {
+          console.error("Error fetching available rooms:", error);
+        });
+    }
+  }, [selectedDay,selectedDate]);
 
   // Handle selection of multiple continuous time slots
   const handleTimeSlotChange = (roomName, slots) => {
@@ -88,7 +91,7 @@ function CreateBooking() {
       .find(slot => slot.startTime === selectedSlots[selectedSlots.length - 1])?.endTime;
 
     try {
-      await axios.post("http://localhost:5000/api/bookings", {
+      await axios.post(`${API}/bookings`, {
         roomId: selectedRoom,
         date: selectedDate,
         day: selectedDay,

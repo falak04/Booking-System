@@ -16,8 +16,9 @@ const facultyNames = [
   "Ms. Anushree Patkar (AP)", "Ms. Monali Sankhe (MS)", "Ms. Savyasachi Pandit (SSP)", "Mr. Chandrashekhar Badgujar (CB)", 
   "Mr. Suryakant Chaudhari (STC)", "Dr. Gayatri Pandya (GP)", "Dr. Naresh Afre (NAF)", "Mr. Pravin Hole (PH)", 
   "Ms. Leena Sahu (LS)"
-];
-
+]
+// const API = import.meta.env.REACT_APP_API_URL;
+const API="http://localhost:5000/api"
 const daysOrder = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6};
 
 function AdminDashboard() {
@@ -31,7 +32,7 @@ function AdminDashboard() {
 
   /** 📌 Fetch All Rooms */
   useEffect(() => {
-    axios.get("http://localhost:5000/api/rooms")
+    axios.get(`${API}/rooms`)
       .then(response => setRooms(response.data))
       .catch(error => console.error("Error fetching rooms:", error));
   }, []);
@@ -39,7 +40,7 @@ function AdminDashboard() {
   /** 📌 Fetch Booking Requests */
   useEffect(() => {
     if (!user?.token) return;
-    axios.get("http://localhost:5000/api/bookings", {
+    axios.get(`${API}/bookings`, {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then(response => setBookings(response.data))
@@ -54,7 +55,7 @@ function AdminDashboard() {
     }
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/rooms/${selectedRoom}/timetable`);
+      const response = await axios.get(`${API}/rooms/${selectedRoom}/timetable`);
       const sortedTimetable = (response.data.timetable || []).sort((a, b) => {
         const dayDiff = (daysOrder[a.day] || 8) - (daysOrder[b.day] || 8);
         if (dayDiff !== 0) return dayDiff;
@@ -71,7 +72,7 @@ function AdminDashboard() {
   /** 📌 Handle Approve Booking */
   const handleApprove = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/bookings/admin/approve/${id}`, {}, {
+      await axios.put(`${API}/bookings/admin/approve/${id}`, {}, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
@@ -86,7 +87,7 @@ function AdminDashboard() {
   /** 📌 Handle Reject Booking */
   const handleReject = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/bookings/admin/reject/${id}`, {}, {
+      await axios.put(`${API}/bookings/admin/reject/${id}`, {}, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
@@ -120,7 +121,7 @@ function AdminDashboard() {
       };
   
       await axios.put(
-        `http://localhost:5000/api/rooms/${roomName}/schedule/${entryId}`,
+        `${API}/rooms/${roomName}/schedule/${entryId}`,
         updatedData, 
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
@@ -149,7 +150,7 @@ function AdminDashboard() {
     if (!window.confirm("Are you sure you want to delete this timetable entry?")) return;
     
     try {
-      await axios.delete(`http://localhost:5000/api/rooms/${roomName}/schedule/${entryId}`, {
+      await axios.delete(`${API}/rooms/${roomName}/schedule/${entryId}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
