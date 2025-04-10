@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { TextField, Button, Typography, MenuItem } from "@mui/material";
-import "./RegisterPage.css";
+import "./Registerpage.css";
 import registerIllustration from '../assets/registerIllustration.png';
 import Navbar from "../components/Navbar";
 import axios from "axios";
