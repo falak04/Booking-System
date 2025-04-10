@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Box, Container, Typography, TextField, Button, InputAdornment, IconButton } from "@mui/material";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import Logo from '../assets/Logo.png';
+// import Logo from '../assets/Logo.png';
 import loginIllustration from '../assets/Login-illustration.png';
 import Navbar from '../components/Navbar';
 function Login() {
