@@ -14,7 +14,7 @@ function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   // const API=import.meta.env.REACT_APP_API_URL;
-  const API="https://bookingsystem-e4oz.onrender.com"
+  const API="https://bookingsystem-e4oz.onrender.com/api"
   console.log(API);
   const handleSubmit = async (e) => {
     e.preventDefault();

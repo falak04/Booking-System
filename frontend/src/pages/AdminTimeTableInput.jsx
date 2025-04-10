@@ -19,7 +19,7 @@ const facultyNames = [
   "Ms. Leena Sahu (LS)","Ms. Prahelika Pai (PP)"
 ];
 // const API=import.meta.env.REACT_APP_API_URL;
-const API="https://bookingsystem-e4oz.onrender.com"
+const API="https://bookingsystem-e4oz.onrender.com/api"
 // Updated to ensure all days from Monday to Saturday are included
 const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 

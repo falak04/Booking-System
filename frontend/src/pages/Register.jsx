@@ -18,7 +18,7 @@ function Register() {
   const navigate = useNavigate();
   // const API=import.meta.env.REACT_APP_API_URL
   // ;
-  const API="https://bookingsystem-e4oz.onrender.com"
+  const API="https://bookingsystem-e4oz.onrender.com/api"
   console.log(API);
   useEffect(() => {
     const fetchFacultyList = async () => {
