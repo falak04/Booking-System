@@ -249,6 +249,8 @@ function HODDashboard() {
                 <FormControl size="small" sx={{ minWidth: 150 }}>
                   <InputLabel>Role</InputLabel>
                   <Select name="role" value={newFaculty.role} onChange={handleInputChange} label="Role">
+                    <MenuItem value="HOD">HOD</MenuItem>
+                    <MenuItem value="Admin">Admin</MenuItem>
                     <MenuItem value="Teacher">Teacher</MenuItem>
                     <MenuItem value="Lab Assistant">Lab Assistant</MenuItem>
                   </Select>
