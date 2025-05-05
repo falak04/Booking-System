@@ -19,6 +19,7 @@ const facultyNames = [
 ]
 // const API = import.meta.env.REACT_APP_API_URL;
 const API="https://bookingsystem-e4oz.onrender.com/api"
+// const API="http://localhost:5000/api"
 const daysOrder = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6};
 
 function AdminDashboard() {

@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
   // const API = import.meta.env.REACT_APP_API_URL;
   const API="https://bookingsystem-e4oz.onrender.com/api"
+  // const API="http://localhost:5000/api"
   useEffect(() => {
     // Use sessionStorage instead of localStorage to ensure logout on restart
     const storedUser = sessionStorage.getItem("user");

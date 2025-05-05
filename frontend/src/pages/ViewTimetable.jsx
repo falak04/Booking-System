@@ -20,6 +20,7 @@ const ViewTimetable = () => {
   const [error, setError] = useState("");
   // const API=import.meta.env.REACT_APP_API_URL;
   const API="https://bookingsystem-e4oz.onrender.com/api"
+  // const API="http://localhost:5000/api"
   // Time slots for the day
   const timeSlots = [
     "08:00-08:30", "08:30-09:00", "09:00-09:30", "09:30-10:00",

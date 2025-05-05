@@ -8,6 +8,7 @@ function Bookings() {
   const [bookings, setBookings] = useState([]);
   // const API=import.meta.env.REACT_APP_API_URL;
   const API="https://bookingsystem-e4oz.onrender.com/api"
+  // const API="http://localhost:5000/api"
   useEffect(() => {
     axios.get(`${API}/bookings`, {
       headers: { Authorization: user?.token },
