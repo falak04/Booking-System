@@ -259,7 +259,7 @@ router.post("/", authenticateUser, async (req, res) => {
             <p><strong>Purpose:</strong> ${purpose}</p>
           </div>
           
-          <p>Please log in to the admin dashboard to approve or reject this request.</p>
+          <p>Please log in to the admin dashboard to approve or reject this request.https://bookingsystem-bay.vercel.app</p>
           <p style="margin-top: 30px; font-size: 12px; color: #777;">This is an automated message. Please do not reply to this email.</p>
         </div>
       `;
