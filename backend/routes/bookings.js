@@ -343,6 +343,8 @@ router.put("/admin/approve/:id", authenticateUser, authorizeRole(["Admin"]), asy
       
       if (hodEmails.length > 0) {
         const formattedDate = new Date(booking.date).toLocaleDateString();
+        const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const bookingDay = daysOfWeek[formattedDate.getUTCDay()]; // Ensure correct day conversion
         const emailSubject = "Booking Approved by Admin - HOD Approval Required";
         const emailMessage = `
           <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px;">
@@ -353,7 +355,7 @@ router.put("/admin/approve/:id", authenticateUser, authorizeRole(["Admin"]), asy
               <p><strong>Teacher:</strong> ${booking.teacher.name} (${booking.teacher.email})</p>
               <p><strong>Room:</strong> ${booking.classroom}</p>
               <p><strong>Date:</strong> ${formattedDate}</p>
-              <p><strong>Day:</strong> ${booking.day}</p>
+              <p><strong>Day:</strong> ${bookingDay}</p>
               <p><strong>Time Slot:</strong> ${booking.timeSlot}</p>
               <p><strong>Purpose:</strong> ${booking.purpose}</p>
             </div>
