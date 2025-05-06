@@ -342,9 +342,11 @@ router.put("/admin/approve/:id", authenticateUser, authorizeRole(["Admin"]), asy
       const hodEmails = await User.find({ role: "HOD" }).select("email").then(hods => hods.map(hod => hod.email));
       
       if (hodEmails.length > 0) {
+        const bookingDate=new Date(booking.date);
         const formattedDate = new Date(booking.date).toLocaleDateString();
         const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        const bookingDay = daysOfWeek[formattedDate.getUTCDay()]; // Ensure correct day conversion
+        const bookingDay = daysOfWeek[bookingDate.getUTCDay()]; // Ensure correct day conversion
+        // Ensure correct day conversion
         const emailSubject = "Booking Approved by Admin - HOD Approval Required";
         const emailMessage = `
           <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px;">
@@ -360,7 +362,7 @@ router.put("/admin/approve/:id", authenticateUser, authorizeRole(["Admin"]), asy
               <p><strong>Purpose:</strong> ${booking.purpose}</p>
             </div>
             
-            <p>Please log in to the HOD dashboard to grant or reject this booking request.</p>
+            <p>Please log in to the HOD dashboard to grant or reject this booking request.https://bookingsystem-bay.vercel.app</p>
             <p style="margin-top: 30px; font-size: 12px; color: #777;">This is an automated message. Please do not reply to this email.</p>
           </div>
         `;
@@ -538,7 +540,7 @@ router.put("/hod/grant/:id", authenticateUser, authorizeRole(["HOD"]), async (re
             <p><strong>Status:</strong> Granted</p>
           </div>
           
-          <p>The room has been allocated for your use as requested.</p>
+          <p>The room has been allocated for your use as requested.https://bookingsystem-bay.vercel.app</p>
           <p style="margin-top: 30px; font-size: 12px; color: #777;">This is an automated message. Please do not reply to this email.</p>
         </div>
       `;
