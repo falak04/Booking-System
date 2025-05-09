@@ -53,7 +53,7 @@ router.post("/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
-
+    console.log(token);
     res.status(200).json({
       message: "Login successful",
       token,
@@ -116,6 +116,51 @@ router.delete("/remove-faculty", authenticateUser, async (req, res) => {
   } catch (err) {
     console.error("❌ Remove Faculty Error:", err);
     res.status(500).json({ error: "Error removing faculty member" });
+  }
+});
+
+// ✅ Update Faculty (HOD only)
+router.put("/update-faculty", authenticateUser, async (req, res) => {
+  try {
+    const { oldName, newName, role } = req.body;
+    if (!isHOD(req.user.role)) {
+      return res.status(403).json({ error: "Only HOD can update faculty members" });
+    }
+
+    const faculty = await Faculty.findOne({ name: oldName });
+    if (!faculty) {
+      return res.status(404).json({ error: "Faculty member not found" });
+    }
+
+    if (faculty.role === "HOD" && role !== "HOD") {
+      return res.status(403).json({ error: "Cannot change HOD's role" });
+    }
+
+    // Check if new name already exists (if name is being changed)
+    if (newName && newName !== oldName) {
+      const existingFaculty = await Faculty.findOne({ name: newName });
+      if (existingFaculty) {
+        return res.status(400).json({ error: "Faculty with this name already exists" });
+      }
+    }
+
+    // Update faculty details
+    faculty.name = newName || oldName;
+    faculty.role = validRoles.includes(role) ? role : faculty.role;
+    await faculty.save();
+
+    // Update user details if user exists
+    const user = await User.findOne({ name: oldName });
+    if (user) {
+      user.name = newName || oldName;
+      user.role = faculty.role;
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Faculty updated successfully", faculty });
+  } catch (err) {
+    console.error("❌ Update Faculty Error:", err);
+    res.status(500).json({ error: "Error updating faculty member" });
   }
 });
 

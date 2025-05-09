@@ -526,6 +526,9 @@ router.put("/hod/grant/:id", authenticateUser, authorizeRole(["HOD"]), async (re
     // 📧 Send notification email to the teacher
     try {
       const emailSubject = "Your Booking Has Been Granted";
+      const bookingDate = new Date(booking.date);
+      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const bookingDay = daysOfWeek[bookingDate.getUTCDay()];
       const emailMessage = `
         <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 600px;">
           <h2 style="color: #27ae60;">Your Booking Has Been Granted</h2>
@@ -534,7 +537,7 @@ router.put("/hod/grant/:id", authenticateUser, authorizeRole(["HOD"]), async (re
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <p><strong>Room:</strong> ${booking.classroom}</p>
             <p><strong>Date:</strong> ${new Date(booking.date).toLocaleDateString()}</p>
-            <p><strong>Day:</strong> ${booking.day}</p>
+            <p><strong>Day:</strong> ${bookingDay}</p>
             <p><strong>Time Slot:</strong> ${booking.timeSlot}</p>
             <p><strong>Purpose:</strong> ${booking.purpose}</p>
             <p><strong>Status:</strong> Granted</p>
@@ -644,6 +647,74 @@ router.get("/teacher", authenticateUser, async (req, res) => {
     res.json(bookings);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 📌 Delete All Bookings (HOD only)
+router.delete("/delete-all", authenticateUser, authorizeRole(["HOD"]), async (req, res) => {
+  try {
+    // Get all bookings
+    const bookings = await Booking.find();
+    console.log(`Found ${bookings.length} bookings to delete`);
+    
+    // Process each booking to remove from room schedules
+    for (const booking of bookings) {
+      try {
+        const room = await Room.findOne({ name: booking.classroom });
+        if (room) {
+          const [startTime, endTime] = booking.timeSlot.split("-");
+          const bookingDate = new Date(booking.date);
+          const date = bookingDate.toISOString().split('T')[0];
+          const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          const bookingDay = daysOfWeek[bookingDate.getUTCDay()];
+
+          // Remove only the booking slots that were pending, approved, or granted
+          const initialLength = room.schedule.length;
+          room.schedule = room.schedule.filter(entry => {
+            // Skip entries without a date
+            if (!entry.date) return true;
+
+            try {
+              const entryDate = entry.date.toISOString().split('T')[0];
+              return !(
+                entryDate === date &&
+                entry.day === bookingDay &&
+                entry.startTime === startTime &&
+                entry.endTime === endTime &&
+                (
+                  entry.approvalStatus === "pendingApproval" ||
+                  entry.approvalStatus === "approved" ||
+                  entry.approvalStatus === "granted"
+                )
+              );
+            } catch (err) {
+              console.error("Error processing schedule entry:", err);
+              return true; // Keep entries that cause errors
+            }
+          });
+
+          if (initialLength !== room.schedule.length) {
+            console.log(`Removed ${initialLength - room.schedule.length} slots from room ${room.name}`);
+            await room.save();
+          }
+        }
+      } catch (roomError) {
+        console.error(`Error processing room for booking ${booking._id}:`, roomError);
+        // Continue with next booking even if this one fails
+      }
+    }
+
+    // Delete all bookings from the database
+    const deleteResult = await Booking.deleteMany({});
+    console.log(`Deleted ${deleteResult.deletedCount} bookings from database`);
+
+    res.json({ 
+      message: "All bookings have been deleted successfully",
+      deletedCount: deleteResult.deletedCount
+    });
+  } catch (error) {
+    console.error("🚨 Error deleting all bookings:", error);
+    res.status(500).json({ error: "Server error while deleting bookings" });
   }
 });
 

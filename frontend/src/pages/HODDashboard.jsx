@@ -38,9 +38,13 @@ function HODDashboard() {
   const [openDialog, setOpenDialog] = useState(false);
   const [facultyToRemove, setFacultyToRemove] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [openUpdateDialog, setOpenUpdateDialog] = useState(false);
+  const [facultyToUpdate, setFacultyToUpdate] = useState(null);
+  const [updateFaculty, setUpdateFaculty] = useState({ name: "", role: "" });
+  const [openDeleteAllDialog, setOpenDeleteAllDialog] = useState(false);
   // const API=import.meta.env.REACT_APP_API_URL;
-  const API="https://bookingsystem-e4oz.onrender.com/api"
-  // const API="http://localhost:5000/api"
+  // const API="https://bookingsystem-e4oz.onrender.com/api"
+  const API="http://localhost:5000/api"
   useEffect(() => {
     if (!user?.token) return;
 
@@ -160,6 +164,80 @@ function HODDashboard() {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  const handleOpenUpdateDialog = (faculty) => {
+    setFacultyToUpdate(faculty);
+    setUpdateFaculty({ name: faculty.name, role: faculty.role });
+    setOpenUpdateDialog(true);
+  };
+
+  const handleUpdateInputChange = (e) => {
+    const { name, value } = e.target;
+    setUpdateFaculty({ ...updateFaculty, [name]: value });
+  };
+
+  const handleUpdateFaculty = async () => {
+    if (!updateFaculty.name) {
+      setSnackbar({ open: true, message: "Faculty name required", severity: "error" });
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${API}/auth/update-faculty`,
+        {
+          oldName: facultyToUpdate.name,
+          newName: updateFaculty.name,
+          role: updateFaculty.role,
+        },
+        {
+          headers: { Authorization: `Bearer ${user.token.trim()}` },
+        }
+      );
+      setOpenUpdateDialog(false);
+      fetchFacultyList();
+      setSnackbar({ open: true, message: "Faculty updated successfully", severity: "success" });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || "Error updating faculty",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleDeleteAllBookings = async () => {
+    try {
+      if (!user?.token) {
+        setSnackbar({
+          open: true,
+          message: "Authentication error. Please log in again.",
+          severity: "error",
+        });
+        return;
+      }
+
+      await axios.delete(
+        `${API}/bookings/delete-all`,
+        {
+          headers: { 
+            Authorization: `Bearer ${user.token.trim()}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+      setOpenDeleteAllDialog(false);
+      setBookings([]);
+      setSnackbar({ open: true, message: "All bookings have been deleted successfully", severity: "success" });
+    } catch (err) {
+      console.error("Delete all bookings error:", err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || "Error deleting all bookings",
+        severity: "error",
+      });
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -174,9 +252,19 @@ function HODDashboard() {
         {/* Bookings Tab */}
         {currentTab === 0 && (
           <Paper elevation={3} sx={{ p: 2 }}>
-            <Typography variant="h5" gutterBottom>
-              Booking Requests
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5">
+                Booking Requests
+              </Typography>
+              <Button 
+                variant="contained" 
+                color="error" 
+                onClick={() => setOpenDeleteAllDialog(true)}
+                disabled={bookings.length === 0}
+              >
+                Delete All Bookings
+              </Button>
+            </Box>
             <Table>
               <TableHead>
                 <TableRow>
@@ -287,6 +375,14 @@ function HODDashboard() {
                       )}
                     </TableCell>
                     <TableCell>
+                      <Button 
+                        color="primary" 
+                        onClick={() => handleOpenUpdateDialog(faculty)} 
+                        size="small"
+                        sx={{ mr: 1 }}
+                      >
+                        Update
+                      </Button>
                       {faculty.role !== "HOD" && (
                         <Button color="error" onClick={() => openRemoveDialog(faculty)} size="small">
                           Remove
@@ -314,6 +410,60 @@ function HODDashboard() {
           <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
           <Button onClick={handleRemoveFaculty} color="error">
             Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Update Faculty Dialog */}
+      <Dialog open={openUpdateDialog} onClose={() => setOpenUpdateDialog(false)}>
+        <DialogTitle>Update Faculty</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <TextField
+              name="name"
+              label="Faculty Name"
+              value={updateFaculty.name}
+              onChange={handleUpdateInputChange}
+              variant="outlined"
+              size="small"
+              fullWidth
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                name="role"
+                value={updateFaculty.role}
+                onChange={handleUpdateInputChange}
+                label="Role"
+              >
+                <MenuItem value="HOD">HOD</MenuItem>
+                <MenuItem value="Admin">Admin</MenuItem>
+                <MenuItem value="Teacher">Teacher</MenuItem>
+                <MenuItem value="Lab Assistant">Lab Assistant</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenUpdateDialog(false)}>Cancel</Button>
+          <Button onClick={handleUpdateFaculty} color="primary">
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete All Bookings Dialog */}
+      <Dialog open={openDeleteAllDialog} onClose={() => setOpenDeleteAllDialog(false)}>
+        <DialogTitle>Confirm Delete All Bookings</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete all bookings? This will remove all booking slots from the timetable and cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDeleteAllDialog(false)}>Cancel</Button>
+          <Button onClick={handleDeleteAllBookings} color="error">
+            Delete All
           </Button>
         </DialogActions>
       </Dialog>

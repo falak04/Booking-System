@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
-const Falculty = require("../models/Falculty");
-require("dotenv").config();
+const dotenv = require("dotenv");
+dotenv.config();
+
+const Faculty = require("../models/Falculty");
 
 const initialFaculty = [
   { name: "Dr. Vinaya Sawant (VS)", role: "HOD" },
@@ -31,16 +33,23 @@ const initialFaculty = [
 ];
 
 const runSeed = async () => {
-    try {
-      await mongoose.connect(process.env.MONGO_URI);
-      await Falculty.deleteMany({});
-      await Falculty.insertMany(initialFaculty);
-      console.log("✅ Faculty seeded successfully");
-    } catch (err) {
-      console.error("❌ Error seeding faculty:", err);
-    } finally {
-      mongoose.disconnect();
-    }
-  };
+  const mongoUri ="mongodb+srv://dhruvnariani207:wbcdhSPn0fD6bKL5@cluster0.0n4p0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"; // fallback
+
+  try {
+    console.log("Connecting to MongoDB:", mongoUri);
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    await Faculty.deleteMany({});
+    await Faculty.insertMany(initialFaculty);
+    console.log("✅ Faculty seeded successfully");
+  } catch (err) {
+    console.error("❌ Error seeding faculty:", err);
+  } finally {
+    await mongoose.disconnect();
+  }
+};
 
 runSeed();
