@@ -4,8 +4,11 @@ import { useNavigate } from "react-router-dom";
 import Logo from "../assets/logo.png";
 import FeedbackIllustration from "../assets/feedback-illustration.png";
 import Navbar from "../components/Navbar";
+
 function Welcome() {
   const navigate = useNavigate();
+
+  const userId = localStorage.getItem('userId');
 
   return (<>
     <Navbar />
